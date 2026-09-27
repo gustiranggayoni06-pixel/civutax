@@ -4,7 +4,7 @@ const cors = require('cors');
 
 const app = express();
 
-// Konfigurasi CORS agar APK Android izinkan akses
+// Konfigurasi CORS agar APK/WebView izinkan akses
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
@@ -20,7 +20,7 @@ const db = mysql.createConnection({
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   port: process.env.DB_PORT,
-  ssl: { rejectUnauthorized: false } // Diperlukan untuk Aiven Cloud
+  ssl: { rejectUnauthorized: false } // Wajib untuk Aiven Cloud
 });
 
 db.connect((err) => {
@@ -28,6 +28,27 @@ db.connect((err) => {
     console.error('Koneksi Database Gagal:', err);
   } else {
     console.log('Terhubung ke Database Aiven MySQL!');
+
+    // Otomatis buat tabel users jika belum ada
+    const createTableQuery = `
+      CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        username VARCHAR(50) NOT NULL UNIQUE,
+        email VARCHAR(100) NOT NULL UNIQUE,
+        password VARCHAR(255) NOT NULL,
+        role VARCHAR(50) DEFAULT 'User',
+        avatar_url TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
+    db.query(createTableQuery, (tableErr) => {
+      if (tableErr) {
+        console.error('Gagal membuat tabel users:', tableErr);
+      } else {
+        console.log('Tabel users berhasil disiapkan di Aiven!');
+      }
+    });
   }
 });
 
