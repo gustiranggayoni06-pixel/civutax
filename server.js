@@ -100,8 +100,61 @@ app.post('/api/login', async (req, res) => {
 });
 
 // Endpoint Register
-app.post('/api/register', async (req, res) => {
-  const { username, email, password } = req.body;
+// 1. ENDPOINT PENGAJUAN AKUN PENDING
+app.post('/api/sales/request-approval', async (req, res) => {
+  const { created_by, creator_role, buyer_username, buyer_password, package_name, package_price, tax_amount } = req.body;
+
+  const newRequest = {
+    created_by,
+    creator_role,
+    buyer_username,
+    buyer_password,
+    package_name,
+    package_price,
+    tax_amount,
+    status: 'pending_approval',
+    created_at: new Date()
+  };
+
+  await db.collection('pending_sales').insertOne(newRequest);
+  res.json({ success: true, message: 'Berhasil dikirim ke antrean ACC Developer' });
+});
+
+// 2. ENDPOINT AMBIL ANTREAN PENDING UNTUK DEVELOPER
+app.get('/api/sales/pending-list', async (req, res) => {
+  const pendingRequests = await db.collection('pending_sales').find({ status: 'pending_approval' }).toArray();
+  res.json({ success: true, requests: pendingRequests });
+});
+
+// 3. ENDPOINT EKSEKUSI ACC/REJECT OLEH DEVELOPER
+app.post('/api/sales/approve', async (req, res) => {
+  const { requestId, action } = req.body;
+
+  if (action === 'approve') {
+    // Ambil data dari antrean pending
+    const reqData = await db.collection('pending_sales').findOne({ _id: new ObjectId(requestId) });
+
+    if (reqData) {
+      // Simpan & aktifkan resmi ke koleksi database user utama
+      await db.collection('users').insertOne({
+        username: reqData.buyer_username,
+        password: reqData.buyer_password,
+        role: reqData.package_name,
+        created_by: reqData.created_by,
+        status: 'active',
+        created_at: new Date()
+      });
+
+      // Update status antrean menjadi 'approved'
+      await db.collection('pending_sales').updateOne({ _id: new ObjectId(requestId) }, { $set: { status: 'approved' } });
+    }
+  } else {
+    // Jika ditolak, hapus/update status jadi 'rejected'
+    await db.collection('pending_sales').updateOne({ _id: new ObjectId(requestId) }, { $set: { status: 'rejected' } });
+  }
+
+  res.json({ success: true, message: 'Status berhasil diperbarui' });
+});
 
   if (!username || !email || !password) {
     return res.status(400).json({ success: false, message: 'Semua kolom pendaftaran wajib diisi!' });
