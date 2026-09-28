@@ -12,13 +12,13 @@ app.use(cors({
 
 app.use(express.json());
 
-// Konfigurasi Pool Database Aiven
+// Konfigurasi Pool Database (TiDB Cloud / Aiven)
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  port: Number(process.env.DB_PORT) || 25547,
+  database: process.env.DB_NAME || 'test',
+  port: Number(process.env.DB_PORT) || 4000,
   ssl: { rejectUnauthorized: false },
   waitForConnections: true,
   connectionLimit: 5,
@@ -26,9 +26,9 @@ const pool = mysql.createPool({
   connectTimeout: 10000 // Timeout 10 detik agar tidak menggantung
 });
 
-// Helper untuk pastikan tabel users ada
-async function ensureTableExists() {
-  const createTableQuery = `
+// Helper untuk memastikan tabel 'users' dan 'global_chats' dibuat otomatis
+async function ensureTablesExist() {
+  const createUsersTable = `
     CREATE TABLE IF NOT EXISTS users (
       id INT AUTO_INCREMENT PRIMARY KEY,
       username VARCHAR(50) NOT NULL UNIQUE,
@@ -39,7 +39,18 @@ async function ensureTableExists() {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `;
-  await pool.query(createTableQuery);
+
+  const createChatsTable = `
+    CREATE TABLE IF NOT EXISTS global_chats (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      username VARCHAR(50) NOT NULL,
+      message TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
+  await pool.query(createUsersTable);
+  await pool.query(createChatsTable);
 }
 
 // Root Route Test
@@ -56,7 +67,7 @@ app.post('/api/login', async (req, res) => {
   }
 
   try {
-    await ensureTableExists();
+    await ensureTablesExist();
     const [rows] = await pool.query(
       'SELECT * FROM users WHERE username = ? OR email = ?',
       [username, username]
@@ -97,7 +108,7 @@ app.post('/api/register', async (req, res) => {
   }
 
   try {
-    await ensureTableExists();
+    await ensureTablesExist();
 
     const [existing] = await pool.query(
       'SELECT * FROM users WHERE username = ? OR email = ?',
@@ -116,6 +127,45 @@ app.post('/api/register', async (req, res) => {
     res.json({ success: true, message: 'Pendaftaran akun berhasil! Silakan login.' });
   } catch (err) {
     console.error('Register Error:', err);
+    res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
+  }
+});
+
+// ==========================================
+// ENDPOINT CHAT GLOBAL
+// ==========================================
+
+// 1. Endpoint Ambil 50 Pesan Terakhir
+app.get('/api/chat/messages', async (req, res) => {
+  try {
+    await ensureTablesExist();
+    const [rows] = await pool.query('SELECT * FROM global_chats ORDER BY id DESC LIMIT 50');
+    // Dibalik agar urutannya dari pesan terlama ke terbaru di layar chat
+    res.json({ success: true, messages: rows.reverse() });
+  } catch (err) {
+    console.error('Fetch Chat Error:', err);
+    res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
+  }
+});
+
+// 2. Endpoint Kirim Pesan Baru
+app.post('/api/chat/send', async (req, res) => {
+  const { username, message } = req.body;
+
+  if (!username || !message) {
+    return res.status(400).json({ success: false, message: 'Username dan pesan wajib diisi!' });
+  }
+
+  try {
+    await ensureTablesExist();
+    await pool.query(
+      'INSERT INTO global_chats (username, message) VALUES (?, ?)',
+      [username, message]
+    );
+
+    res.json({ success: true, message: 'Pesan berhasil terkirim!' });
+  } catch (err) {
+    console.error('Send Chat Error:', err);
     res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
   }
 });
