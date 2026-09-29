@@ -12,6 +12,10 @@ app.use(cors({
 
 app.use(express.json());
 
+// Konfigurasi Bot Telegram (Ganti atau atur via Environment Variables Vercel/Server)
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN';
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || 'YOUR_TELEGRAM_CHAT_ID';
+
 // Konfigurasi Pool Database MySQL (TiDB Cloud / Aiven)
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
@@ -71,11 +75,50 @@ async function ensureTablesExist() {
   await pool.query(createChatsTable);
   await pool.query(createPendingSalesTable);
 
-  // Auto add reply_to column jika tabel lama belum punya
+  // Otomatis tambah kolom reply_to jika database lama belum memilikinya
   try {
     await pool.query('ALTER TABLE global_chats ADD COLUMN reply_to JSON NULL');
   } catch (e) {
-    // Abaikan error jika kolom sudah ada
+    // Abaikan jika kolom sudah ada
+  }
+}
+
+// Fungsi Kirim Notifikasi ke Bot Telegram
+async function sendTelegramNotification(pendingData) {
+  if (!TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN === 'YOUR_TELEGRAM_BOT_TOKEN') return;
+
+  const messageText = 
+    `⚡ *PENGAJUAN AKUN BARU (NEED ACC)* ⚡\n\n` +
+    `• *Pemohon*: ${pendingData.created_by} (${pendingData.creator_role || 'User'})\n` +
+    `• *Username Akun*: \`${pendingData.buyer_username}\`\n` +
+    `• *Password*: \`${pendingData.buyer_password}\`\n` +
+    `• *Paket*: ${pendingData.package_name}\n` +
+    `• *Harga*: Rp${Number(pendingData.package_price).toLocaleString('id-ID')}\n` +
+    `• *Pajak (10%)*: Rp${Number(pendingData.tax_amount).toLocaleString('id-ID')}\n\n` +
+    `Pilih tindakan di bawah ini untuk memproses:`;
+
+  const replyMarkup = {
+    inline_keyboard: [
+      [
+        { text: '✅ ACC / Aktifkan', callback_data: `acc_${pendingData.id}` },
+        { text: '❌ Tolak / Reject', callback_data: `reject_${pendingData.id}` }
+      ]
+    ]
+  };
+
+  try {
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: TELEGRAM_CHAT_ID,
+        text: messageText,
+        parse_mode: 'Markdown',
+        reply_markup: replyMarkup
+      })
+    });
+  } catch (err) {
+    console.error('Gagal mengirim pesan Telegram:', err.message);
   }
 }
 
@@ -186,13 +229,25 @@ app.post('/api/sales/request-approval', async (req, res) => {
 
   try {
     await ensureTablesExist();
-    await pool.query(
+    const [result] = await pool.query(
       `INSERT INTO pending_sales (created_by, creator_role, buyer_username, buyer_password, package_name, package_price, tax_amount, status) 
        VALUES (?, ?, ?, ?, ?, ?, ?, 'pending_approval')`,
       [created_by, creator_role, buyer_username, buyer_password, package_name, package_price, tax_amount]
     );
 
-    res.json({ success: true, message: 'Berhasil dikirim ke antrean ACC Developer' });
+    // Otomatis kirim notifikasi interaktif ke Bot Telegram
+    sendTelegramNotification({
+      id: result.insertId,
+      created_by,
+      creator_role,
+      buyer_username,
+      buyer_password,
+      package_name,
+      package_price,
+      tax_amount
+    });
+
+    res.json({ success: true, message: 'Berhasil dikirim ke antrean ACC Developer & Telegram!' });
   } catch (err) {
     console.error('Request Sales Error:', err);
     res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
@@ -211,7 +266,7 @@ app.get('/api/sales/pending-list', async (req, res) => {
   }
 });
 
-// 3. Eksekusi ACC / Reject oleh Developer
+// 3. Eksekusi ACC / Reject dari Web Dashboard Developer
 app.post('/api/sales/approve', async (req, res) => {
   const { requestId, action } = req.body;
 
@@ -241,6 +296,64 @@ app.post('/api/sales/approve', async (req, res) => {
     console.error('Approve Error:', err);
     res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
   }
+});
+
+// 4. Webhook Telegram (Menerima Klik Tombol ACC/Reject Langsung dari Aplikasi Telegram)
+app.post('/api/telegram/webhook', async (req, res) => {
+  const { callback_query } = req.body;
+
+  if (callback_query) {
+    const data = callback_query.data;
+    const chatId = callback_query.message.chat.id;
+    const messageId = callback_query.message.message_id;
+
+    const [action, requestId] = data.split('_');
+
+    try {
+      await ensureTablesExist();
+      const [rows] = await pool.query('SELECT * FROM pending_sales WHERE id = ?', [requestId]);
+
+      if (rows.length > 0) {
+        const reqData = rows[0];
+
+        if (action === 'acc') {
+          await pool.query(
+            'INSERT INTO users (username, password, role, created_by, status) VALUES (?, ?, ?, ?, "active")',
+            [reqData.buyer_username, reqData.buyer_password, reqData.package_name, reqData.created_by]
+          );
+          await pool.query('UPDATE pending_sales SET status = "approved" WHERE id = ?', [requestId]);
+
+          await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              message_id: messageId,
+              text: `✅ *AKUN BERHASIL DI-ACC & AKTIF!*\n\n• Username: \`${reqData.buyer_username}\`\n• Password: \`${reqData.buyer_password}\`\n• Paket: ${reqData.package_name}\n• Diproses oleh: Developer Ranzz (via Telegram)`,
+              parse_mode: 'Markdown'
+            })
+          });
+        } else if (action === 'reject') {
+          await pool.query('UPDATE pending_sales SET status = "rejected" WHERE id = ?', [requestId]);
+
+          await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              message_id: messageId,
+              text: `❌ *PENGAJUAN DITOLAK!*\n\n• Username: \`${reqData.buyer_username}\`\n• Status: Rejected`,
+              parse_mode: 'Markdown'
+            })
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Telegram Webhook Error:', err);
+    }
+  }
+
+  res.sendStatus(200);
 });
 
 // ==========================================
@@ -277,7 +390,6 @@ app.post('/api/chat/send', async (req, res) => {
         [username, message, replyData]
       );
     } catch (insertErr) {
-      // Fallback jika kolom reply_to gagal
       await pool.query(
         'INSERT INTO global_chats (username, message) VALUES (?, ?)',
         [username, message]
