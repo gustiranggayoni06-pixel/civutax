@@ -47,6 +47,7 @@ async function ensureTablesExist() {
       id INT AUTO_INCREMENT PRIMARY KEY,
       username VARCHAR(50) NOT NULL,
       message TEXT NOT NULL,
+      reply_to JSON NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `;
@@ -242,6 +243,7 @@ app.post('/api/sales/approve', async (req, res) => {
 // ENDPOINT CHAT GLOBAL
 // ==========================================
 
+// Ambil Riwayat Chat
 app.get('/api/chat/messages', async (req, res) => {
   try {
     await ensureTablesExist();
@@ -253,8 +255,9 @@ app.get('/api/chat/messages', async (req, res) => {
   }
 });
 
+// Kirim Pesan Chat Baru
 app.post('/api/chat/send', async (req, res) => {
-  const { username, message } = req.body;
+  const { username, message, reply_to } = req.body;
 
   if (!username || !message) {
     return res.status(400).json({ success: false, message: 'Username dan pesan wajib diisi!' });
@@ -262,14 +265,35 @@ app.post('/api/chat/send', async (req, res) => {
 
   try {
     await ensureTablesExist();
+    const replyData = reply_to ? JSON.stringify(reply_to) : null;
+
     await pool.query(
-      'INSERT INTO global_chats (username, message) VALUES (?, ?)',
-      [username, message]
+      'INSERT INTO global_chats (username, message, reply_to) VALUES (?, ?, ?)',
+      [username, message, replyData]
     );
 
     res.json({ success: true, message: 'Pesan berhasil terkirim!' });
   } catch (err) {
     console.error('Send Chat Error:', err);
+    res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
+  }
+});
+
+// Bersihkan Seluruh Riwayat Chat (Otorisasi Developer Ranzz)
+app.delete('/api/chat/clear', async (req, res) => {
+  const { username } = req.body;
+
+  if (!username || username.toLowerCase() !== 'ranzz') {
+    return res.status(403).json({ success: false, message: 'Akses ditolak! Hanya Ranzz yang dapat membersihkan chat.' });
+  }
+
+  try {
+    await ensureTablesExist();
+    await pool.query('DELETE FROM global_chats'); // Menghapus seluruh isi tabel pesan di MySQL
+
+    res.json({ success: true, message: 'Seluruh riwayat chat di database berhasil dibersihkan!' });
+  } catch (err) {
+    console.error('Clear Chat Error:', err);
     res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
   }
 });
