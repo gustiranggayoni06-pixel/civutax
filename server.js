@@ -13,8 +13,8 @@ app.use(cors({
 app.use(express.json());
 
 // Konfigurasi Bot Telegram (Ganti atau atur via Environment Variables Vercel/Server)
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN';
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || 'YOUR_TELEGRAM_CHAT_ID';
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8563757113:AAG1gW-Px-E-JzDDgQWlBbdYIyUdxXd6Ykk';
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '5474893948';
 
 // Konfigurasi Pool Database MySQL (TiDB Cloud / Aiven)
 const pool = mysql.createPool({
