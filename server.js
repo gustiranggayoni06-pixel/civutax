@@ -26,7 +26,7 @@ const pool = mysql.createPool({
   connectTimeout: 10000
 });
 
-// Helper untuk memastikan tabel-tabel penting dibuat otomatis di MySQL
+// Helper untuk memastikan tabel-tabel penting dibuat & diupdate otomatis di MySQL
 async function ensureTablesExist() {
   const createUsersTable = `
     CREATE TABLE IF NOT EXISTS users (
@@ -70,6 +70,13 @@ async function ensureTablesExist() {
   await pool.query(createUsersTable);
   await pool.query(createChatsTable);
   await pool.query(createPendingSalesTable);
+
+  // Auto add reply_to column jika tabel lama belum punya
+  try {
+    await pool.query('ALTER TABLE global_chats ADD COLUMN reply_to JSON NULL');
+  } catch (e) {
+    // Abaikan error jika kolom sudah ada
+  }
 }
 
 // Root Route Test
@@ -219,16 +226,13 @@ app.post('/api/sales/approve', async (req, res) => {
     const reqData = rows[0];
 
     if (action === 'approve') {
-      // Simpan akun ke tabel users utama
       await pool.query(
         'INSERT INTO users (username, password, role, created_by, status) VALUES (?, ?, ?, ?, "active")',
         [reqData.buyer_username, reqData.buyer_password, reqData.package_name, reqData.created_by]
       );
 
-      // Update status antrean menjadi approved
       await pool.query('UPDATE pending_sales SET status = "approved" WHERE id = ?', [requestId]);
     } else {
-      // Update status antrean menjadi rejected
       await pool.query('UPDATE pending_sales SET status = "rejected" WHERE id = ?', [requestId]);
     }
 
@@ -267,10 +271,18 @@ app.post('/api/chat/send', async (req, res) => {
     await ensureTablesExist();
     const replyData = reply_to ? JSON.stringify(reply_to) : null;
 
-    await pool.query(
-      'INSERT INTO global_chats (username, message, reply_to) VALUES (?, ?, ?)',
-      [username, message, replyData]
-    );
+    try {
+      await pool.query(
+        'INSERT INTO global_chats (username, message, reply_to) VALUES (?, ?, ?)',
+        [username, message, replyData]
+      );
+    } catch (insertErr) {
+      // Fallback jika kolom reply_to gagal
+      await pool.query(
+        'INSERT INTO global_chats (username, message) VALUES (?, ?)',
+        [username, message]
+      );
+    }
 
     res.json({ success: true, message: 'Pesan berhasil terkirim!' });
   } catch (err) {
@@ -289,7 +301,7 @@ app.delete('/api/chat/clear', async (req, res) => {
 
   try {
     await ensureTablesExist();
-    await pool.query('DELETE FROM global_chats'); // Menghapus seluruh isi tabel pesan di MySQL
+    await pool.query('DELETE FROM global_chats');
 
     res.json({ success: true, message: 'Seluruh riwayat chat di database berhasil dibersihkan!' });
   } catch (err) {
