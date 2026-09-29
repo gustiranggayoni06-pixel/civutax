@@ -189,12 +189,12 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// Endpoint Ubah Password (Change Password)
+// Endpoint Ubah Password (Change Password / Reset Password)
 app.post('/api/users/change-password', async (req, res) => {
-  const { username, oldPassword, newPassword } = req.body;
+  const { username, oldPassword, newPassword, requested_by, requested_role } = req.body;
 
-  if (!username || !oldPassword || !newPassword) {
-    return res.status(400).json({ success: false, message: 'Semua kolom wajib diisi!' });
+  if (!username || !newPassword) {
+    return res.status(400).json({ success: false, message: 'Username target dan password baru wajib diisi!' });
   }
 
   try {
@@ -203,17 +203,29 @@ app.post('/api/users/change-password', async (req, res) => {
     const [rows] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
 
     if (rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Pengguna tidak ditemukan!' });
+      return res.status(404).json({ success: false, message: 'Pengguna target tidak ditemukan!' });
     }
 
-    const user = rows[0];
-    if (user.password !== oldPassword) {
-      return res.status(400).json({ success: false, message: 'Password saat ini (password lama) salah!' });
+    const targetUser = rows[0];
+    const reqUser = (requested_by || username).toLowerCase();
+    const reqRole = (requested_role || '').toLowerCase();
+
+    // Cek privilege: Jika role adalah Developer/Reseller/Partner/Owner atau mengubah milik sendiri tanpa password lama, izinkan bypass.
+    const isSelfChange = reqUser === username.toLowerCase();
+    const hasPrivilege = ['ranzz', 'developer', 'reseller', 'partner', 'owner', 'own', 'full up'].some(r => reqRole.includes(r) || reqUser === 'ranzz');
+
+    if (isSelfChange && !hasPrivilege) {
+      if (!oldPassword) {
+        return res.status(400).json({ success: false, message: 'Password lama wajib diisi!' });
+      }
+      if (targetUser.password !== oldPassword) {
+        return res.status(400).json({ success: false, message: 'Password saat ini (password lama) salah!' });
+      }
     }
 
     await pool.query('UPDATE users SET password = ? WHERE username = ?', [newPassword, username]);
 
-    res.json({ success: true, message: 'Password berhasil diperbarui!' });
+    res.json({ success: true, message: `Password untuk akun '${username}' berhasil diperbarui!` });
   } catch (err) {
     console.error('Change Password Error:', err);
     res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
