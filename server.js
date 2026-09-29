@@ -189,6 +189,37 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
+// Endpoint Ubah Password (Change Password)
+app.post('/api/users/change-password', async (req, res) => {
+  const { username, oldPassword, newPassword } = req.body;
+
+  if (!username || !oldPassword || !newPassword) {
+    return res.status(400).json({ success: false, message: 'Semua kolom wajib diisi!' });
+  }
+
+  try {
+    await ensureTablesExist();
+
+    const [rows] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Pengguna tidak ditemukan!' });
+    }
+
+    const user = rows[0];
+    if (user.password !== oldPassword) {
+      return res.status(400).json({ success: false, message: 'Password saat ini (password lama) salah!' });
+    }
+
+    await pool.query('UPDATE users SET password = ? WHERE username = ?', [newPassword, username]);
+
+    res.json({ success: true, message: 'Password berhasil diperbarui!' });
+  } catch (err) {
+    console.error('Change Password Error:', err);
+    res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
+  }
+});
+
 // Cek Username Duplikat
 app.get('/api/users/check-username', async (req, res) => {
   const { username } = req.query;
