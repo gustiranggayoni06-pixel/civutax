@@ -75,7 +75,11 @@ async function ensureTablesExist() {
   await pool.query(createChatsTable);
   await pool.query(createPendingSalesTable);
 
-  // MIGRASI KOLOM OTOMATIS JIKA TABEL SUDAH ADA SEBELUMNYA
+  // MIGRASI OTOMATIS: Tambahkan kolom status & created_by jika belum ada di tabel users
+  try {
+    await pool.query('ALTER TABLE users ADD COLUMN status VARCHAR(20) DEFAULT "active"');
+  } catch (e) {}
+
   try {
     await pool.query('ALTER TABLE users ADD COLUMN created_by VARCHAR(50) DEFAULT "system"');
   } catch (e) {}
