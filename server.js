@@ -36,7 +36,7 @@ async function ensureTablesExist() {
     CREATE TABLE IF NOT EXISTS users (
       id INT AUTO_INCREMENT PRIMARY KEY,
       username VARCHAR(50) NOT NULL UNIQUE,
-      email VARCHAR(100) UNIQUE,
+      email VARCHAR(100) NULL DEFAULT NULL,
       password VARCHAR(255) NOT NULL,
       role VARCHAR(50) DEFAULT 'User',
       avatar_url TEXT,
@@ -75,7 +75,11 @@ async function ensureTablesExist() {
   await pool.query(createChatsTable);
   await pool.query(createPendingSalesTable);
 
-  // MIGRASI OTOMATIS: Tambahkan kolom status & created_by jika belum ada di tabel users
+  // MIGRASI OTOMATIS KOLOM TABEL USERS & GLOBAL CHATS
+  try {
+    await pool.query('ALTER TABLE users MODIFY COLUMN email VARCHAR(100) NULL DEFAULT NULL');
+  } catch (e) {}
+
   try {
     await pool.query('ALTER TABLE users ADD COLUMN status VARCHAR(20) DEFAULT "active"');
   } catch (e) {}
@@ -198,7 +202,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// Endpoint Ubah Password (Change Password / Reset Password)
+// Endpoint Ubah Password
 app.post('/api/users/change-password', async (req, res) => {
   const { username, oldPassword, newPassword, requested_by, requested_role } = req.body;
 
@@ -321,7 +325,12 @@ app.post('/api/sales/approve', async (req, res) => {
         return res.status(400).json({ success: false, message: 'Username sudah aktif terdaftar di database!' });
       }
 
-      await pool.query('INSERT INTO users (username, password, role, created_by, status) VALUES (?, ?, ?, ?, "active")', [reqData.buyer_username, reqData.buyer_password, reqData.package_name, reqData.created_by]);
+      const generatedEmail = `${reqData.buyer_username.toLowerCase()}@civutax.com`;
+
+      await pool.query(
+        'INSERT INTO users (username, email, password, role, created_by, status) VALUES (?, ?, ?, ?, ?, "active")', 
+        [reqData.buyer_username, generatedEmail, reqData.buyer_password, reqData.package_name, reqData.created_by]
+      );
       await pool.query('UPDATE pending_sales SET status = "approved" WHERE id = ?', [requestId]);
     } else {
       await pool.query('UPDATE pending_sales SET status = "rejected" WHERE id = ?', [requestId]);
@@ -333,14 +342,14 @@ app.post('/api/sales/approve', async (req, res) => {
   }
 });
 
-// WEBHOOK TELEGRAM LENGKAP (RESPONS COMMAND & TOMBOL ACC)
+// WEBHOOK TELEGRAM LENGKAP
 app.post('/api/telegram/webhook', async (req, res) => {
   const { message, callback_query } = req.body;
 
   try {
     await ensureTablesExist();
 
-    // 1. PENANGANAN BOT COMMANDS (/start, /menu, /pending, /stats)
+    // 1. PENANGANAN BOT COMMANDS
     if (message && message.text) {
       const chatId = String(message.chat.id);
       const text = message.text.trim();
@@ -430,9 +439,10 @@ app.post('/api/telegram/webhook', async (req, res) => {
             const [existingUser] = await pool.query('SELECT id FROM users WHERE username = ?', [reqData.buyer_username]);
 
             if (existingUser.length === 0) {
+              const generatedEmail = `${reqData.buyer_username.toLowerCase()}@civutax.com`;
               await pool.query(
-                'INSERT INTO users (username, password, role, created_by, status) VALUES (?, ?, ?, ?, "active")',
-                [reqData.buyer_username, reqData.buyer_password, reqData.package_name, reqData.created_by]
+                'INSERT INTO users (username, email, password, role, created_by, status) VALUES (?, ?, ?, ?, ?, "active")',
+                [reqData.buyer_username, generatedEmail, reqData.buyer_password, reqData.package_name, reqData.created_by]
               );
             }
             await pool.query('UPDATE pending_sales SET status = "approved" WHERE id = ?', [requestId]);
