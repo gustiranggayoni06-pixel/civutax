@@ -300,7 +300,7 @@ app.get('/api/sales/pending-list', async (req, res) => {
   }
 });
 
-// Eksekusi ACC / Reject Web
+// Eksekusi ACC / Reject Web (Dengan Proteksi Fallback Query)
 app.post('/api/sales/approve', async (req, res) => {
   const { requestId, action } = req.body;
 
@@ -322,15 +322,24 @@ app.post('/api/sales/approve', async (req, res) => {
       
       if (existingUser.length > 0) {
         await pool.query('UPDATE pending_sales SET status = "approved" WHERE id = ?', [requestId]);
-        return res.status(400).json({ success: false, message: 'Username sudah aktif terdaftar di database!' });
+        return res.json({ success: true, message: 'Username sudah aktif terdaftar sebelumnya, status diperbarui ke Approved!' });
       }
 
-      const generatedEmail = `${reqData.buyer_username.toLowerCase()}@civutax.com`;
+      // METODE AMAN: Coba insert lengkap, jika DB gagal langsung fallback ke insert dasar
+      try {
+        const generatedEmail = `${reqData.buyer_username.toLowerCase()}@civutax.com`;
+        await pool.query(
+          'INSERT INTO users (username, email, password, role, created_by, status) VALUES (?, ?, ?, ?, ?, "active")', 
+          [reqData.buyer_username, generatedEmail, reqData.buyer_password, reqData.package_name, reqData.created_by]
+        );
+      } catch (insertErr) {
+        console.warn('Gagal insert lengkap, menjalankan fallback query:', insertErr.message);
+        await pool.query(
+          'INSERT INTO users (username, password, role) VALUES (?, ?, ?)', 
+          [reqData.buyer_username, reqData.buyer_password, reqData.package_name]
+        );
+      }
 
-      await pool.query(
-        'INSERT INTO users (username, email, password, role, created_by, status) VALUES (?, ?, ?, ?, ?, "active")', 
-        [reqData.buyer_username, generatedEmail, reqData.buyer_password, reqData.package_name, reqData.created_by]
-      );
       await pool.query('UPDATE pending_sales SET status = "approved" WHERE id = ?', [requestId]);
     } else {
       await pool.query('UPDATE pending_sales SET status = "rejected" WHERE id = ?', [requestId]);
@@ -338,6 +347,7 @@ app.post('/api/sales/approve', async (req, res) => {
 
     res.json({ success: true, message: 'Status berhasil diperbarui' });
   } catch (err) {
+    console.error('Approve Error:', err);
     res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
   }
 });
@@ -439,11 +449,19 @@ app.post('/api/telegram/webhook', async (req, res) => {
             const [existingUser] = await pool.query('SELECT id FROM users WHERE username = ?', [reqData.buyer_username]);
 
             if (existingUser.length === 0) {
-              const generatedEmail = `${reqData.buyer_username.toLowerCase()}@civutax.com`;
-              await pool.query(
-                'INSERT INTO users (username, email, password, role, created_by, status) VALUES (?, ?, ?, ?, ?, "active")',
-                [reqData.buyer_username, generatedEmail, reqData.buyer_password, reqData.package_name, reqData.created_by]
-              );
+              try {
+                const generatedEmail = `${reqData.buyer_username.toLowerCase()}@civutax.com`;
+                await pool.query(
+                  'INSERT INTO users (username, email, password, role, created_by, status) VALUES (?, ?, ?, ?, ?, "active")',
+                  [reqData.buyer_username, generatedEmail, reqData.buyer_password, reqData.package_name, reqData.created_by]
+                );
+              } catch (insertErr) {
+                console.warn('Fallback Telegram ACC:', insertErr.message);
+                await pool.query(
+                  'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
+                  [reqData.buyer_username, reqData.buyer_password, reqData.package_name]
+                );
+              }
             }
             await pool.query('UPDATE pending_sales SET status = "approved" WHERE id = ?', [requestId]);
 
