@@ -30,7 +30,7 @@ const pool = mysql.createPool({
   connectTimeout: 10000
 });
 
-// Helper untuk memastikan tabel-tabel penting dibuat & diupdate otomatis
+// Helper untuk memastikan tabel-tabel penting dibuat & migrasi kolom otomatis
 async function ensureTablesExist() {
   const createUsersTable = `
     CREATE TABLE IF NOT EXISTS users (
@@ -40,7 +40,7 @@ async function ensureTablesExist() {
       password VARCHAR(255) NOT NULL,
       role VARCHAR(50) DEFAULT 'User',
       avatar_url TEXT,
-      created_by VARCHAR(50),
+      created_by VARCHAR(50) DEFAULT 'system',
       status VARCHAR(20) DEFAULT 'active',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
@@ -74,6 +74,11 @@ async function ensureTablesExist() {
   await pool.query(createUsersTable);
   await pool.query(createChatsTable);
   await pool.query(createPendingSalesTable);
+
+  // MIGRASI KOLOM OTOMATIS JIKA TABEL SUDAH ADA SEBELUMNYA
+  try {
+    await pool.query('ALTER TABLE users ADD COLUMN created_by VARCHAR(50) DEFAULT "system"');
+  } catch (e) {}
 
   try {
     await pool.query('ALTER TABLE global_chats ADD COLUMN reply_to JSON NULL');
@@ -210,7 +215,6 @@ app.post('/api/users/change-password', async (req, res) => {
     const reqUser = (requested_by || username).toLowerCase();
     const reqRole = (requested_role || '').toLowerCase();
 
-    // Cek privilege: Jika role adalah Developer/Reseller/Partner/Owner atau mengubah milik sendiri tanpa password lama, izinkan bypass.
     const isSelfChange = reqUser === username.toLowerCase();
     const hasPrivilege = ['ranzz', 'developer', 'reseller', 'partner', 'owner', 'own', 'full up'].some(r => reqRole.includes(r) || reqUser === 'ranzz');
 
@@ -300,7 +304,19 @@ app.post('/api/sales/approve', async (req, res) => {
 
     const reqData = rows[0];
 
+    if (reqData.status !== 'pending_approval') {
+      return res.status(400).json({ success: false, message: 'Pengajuan ini sudah pernah diproses!' });
+    }
+
     if (action === 'approve') {
+      // CEK DUPLIKASI USERNAME SEBELUM INSERT
+      const [existingUser] = await pool.query('SELECT id FROM users WHERE username = ?', [reqData.buyer_username]);
+      
+      if (existingUser.length > 0) {
+        await pool.query('UPDATE pending_sales SET status = "approved" WHERE id = ?', [requestId]);
+        return res.status(400).json({ success: false, message: 'Username sudah aktif terdaftar di database!' });
+      }
+
       await pool.query('INSERT INTO users (username, password, role, created_by, status) VALUES (?, ?, ?, ?, "active")', [reqData.buyer_username, reqData.buyer_password, reqData.package_name, reqData.created_by]);
       await pool.query('UPDATE pending_sales SET status = "approved" WHERE id = ?', [requestId]);
     } else {
@@ -325,7 +341,6 @@ app.post('/api/telegram/webhook', async (req, res) => {
       const chatId = String(message.chat.id);
       const text = message.text.trim();
 
-      // Verifikasi pengirim adalah Developer
       if (chatId !== DEV_CHAT_ID) {
         await sendTelegramMessage(chatId, "❌ Akses Ditolak! Anda bukan Developer Ranzz.");
         return res.sendStatus(200);
@@ -393,11 +408,29 @@ app.post('/api/telegram/webhook', async (req, res) => {
         if (rows.length > 0) {
           const reqData = rows[0];
 
+          if (reqData.status !== 'pending_approval') {
+            await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: chatId,
+                message_id: messageId,
+                text: `⚠️ *PENGAJUAN INI SUDAH PERNAH DIPROSES SEBELUMNYA!*`,
+                parse_mode: 'Markdown'
+              })
+            });
+            return res.sendStatus(200);
+          }
+
           if (action === 'acc') {
-            await pool.query(
-              'INSERT INTO users (username, password, role, created_by, status) VALUES (?, ?, ?, ?, "active")',
-              [reqData.buyer_username, reqData.buyer_password, reqData.package_name, reqData.created_by]
-            );
+            const [existingUser] = await pool.query('SELECT id FROM users WHERE username = ?', [reqData.buyer_username]);
+
+            if (existingUser.length === 0) {
+              await pool.query(
+                'INSERT INTO users (username, password, role, created_by, status) VALUES (?, ?, ?, ?, "active")',
+                [reqData.buyer_username, reqData.buyer_password, reqData.package_name, reqData.created_by]
+              );
+            }
             await pool.query('UPDATE pending_sales SET status = "approved" WHERE id = ?', [requestId]);
 
             await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`, {
