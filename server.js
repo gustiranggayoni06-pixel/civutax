@@ -202,7 +202,18 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// Endpoint Ubah Password
+// Endpoint Ambil Seluruh User Database (Khusus Tab Bar Developer)
+app.get('/api/users/all', async (req, res) => {
+  try {
+    await ensureTablesExist();
+    const [rows] = await pool.query('SELECT id, username, password, role, created_by, status, created_at FROM users ORDER BY id DESC');
+    res.json({ success: true, users: rows });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
+  }
+});
+
+// Endpoint Ubah Password / Edit User
 app.post('/api/users/change-password', async (req, res) => {
   const { username, oldPassword, newPassword, requested_by, requested_role } = req.body;
 
@@ -240,6 +251,33 @@ app.post('/api/users/change-password', async (req, res) => {
     res.json({ success: true, message: `Password untuk akun '${username}' berhasil diperbarui!` });
   } catch (err) {
     console.error('Change Password Error:', err);
+    res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
+  }
+});
+
+// Endpoint Hapus Akun Permanen dari Database (Khusus Developer Panel)
+app.post('/api/users/delete', async (req, res) => {
+  const { username, requested_by } = req.body;
+
+  if (!username) {
+    return res.status(400).json({ success: false, message: 'Username target wajib diisi!' });
+  }
+
+  if (!requested_by || requested_role.toLowerCase() !== 'ranzz') {
+    // izinkan bypass jika dipanggil dari panel dev Ranzz
+  }
+
+  try {
+    await ensureTablesExist();
+    const [rows] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Username target tidak ditemukan di database!' });
+    }
+
+    await pool.query('DELETE FROM users WHERE username = ?', [username]);
+    res.json({ success: true, message: `Akun '${username}' berhasil dihapus secara permanen dari database!` });
+  } catch (err) {
     res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
   }
 });
