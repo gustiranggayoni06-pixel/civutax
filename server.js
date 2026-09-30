@@ -257,7 +257,7 @@ app.post('/api/users/change-password', async (req, res) => {
 
 // Endpoint Hapus Akun Permanen dari Database (Khusus Developer Panel)
 app.post('/api/users/delete', async (req, res) => {
-  const { username, requested_by, requested_role } = req.body;
+  const { username } = req.body;
 
   if (!username) {
     return res.status(400).json({ success: false, message: 'Username target wajib diisi!' });
@@ -324,11 +324,14 @@ app.post('/api/sales/request-approval', async (req, res) => {
   }
 });
 
-// Ambil Daftar Antrean Pending
+// =========================================================================
+// 📌 FIX UTAMA: MENGAMBIL SELURUH PENJUALAN (PENDING, APPROVED, REJECTED)
+// =========================================================================
 app.get('/api/sales/pending-list', async (req, res) => {
   try {
     await ensureTablesExist();
-    const [rows] = await pool.query('SELECT * FROM pending_sales WHERE status = "pending_approval" ORDER BY id DESC');
+    // Mengambil SELURUH riwayat transaksi penjualan agar status ACC & Nominal Rupiah bisa dihitung
+    const [rows] = await pool.query('SELECT * FROM pending_sales ORDER BY id DESC');
     res.json({ success: true, requests: rows });
   } catch (err) {
     res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
@@ -352,7 +355,6 @@ app.post('/api/sales/approve', async (req, res) => {
     }
 
     if (action === 'approve') {
-      // CEK DUPLIKASI USERNAME SEBELUM INSERT
       const [existingUser] = await pool.query('SELECT id FROM users WHERE username = ?', [reqData.buyer_username]);
       
       if (existingUser.length > 0) {
@@ -360,7 +362,6 @@ app.post('/api/sales/approve', async (req, res) => {
         return res.json({ success: true, message: 'Username sudah aktif terdaftar sebelumnya, status diperbarui ke Approved!' });
       }
 
-      // METODE AMAN: Coba insert lengkap, jika DB gagal langsung fallback ke insert dasar
       try {
         const generatedEmail = `${reqData.buyer_username.toLowerCase()}@civutax.com`;
         await pool.query(
@@ -453,7 +454,7 @@ app.post('/api/telegram/webhook', async (req, res) => {
       }
     }
 
-    // 2. PENANGANAN KLIK TOMBOL INTERAKTIF (CALLBACK QUERY)
+    // 2. PENANGANAN KLIK TOMBOL INTERAKTIF (CALLBACK QUERY TOMBOL ACC/REJECT TELEGRAM)
     if (callback_query) {
       const data = callback_query.data;
       const chatId = callback_query.message.chat.id;
@@ -498,6 +499,8 @@ app.post('/api/telegram/webhook', async (req, res) => {
                 );
               }
             }
+            
+            // Ubah status ke approved di database MySQL
             await pool.query('UPDATE pending_sales SET status = "approved" WHERE id = ?', [requestId]);
 
             await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`, {
