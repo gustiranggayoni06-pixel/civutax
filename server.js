@@ -257,14 +257,10 @@ app.post('/api/users/change-password', async (req, res) => {
 
 // Endpoint Hapus Akun Permanen dari Database (Khusus Developer Panel)
 app.post('/api/users/delete', async (req, res) => {
-  const { username, requested_by } = req.body;
+  const { username, requested_by, requested_role } = req.body;
 
   if (!username) {
     return res.status(400).json({ success: false, message: 'Username target wajib diisi!' });
-  }
-
-  if (!requested_by || requested_role.toLowerCase() !== 'ranzz') {
-    // izinkan bypass jika dipanggil dari panel dev Ranzz
   }
 
   try {
@@ -272,12 +268,13 @@ app.post('/api/users/delete', async (req, res) => {
     const [rows] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
 
     if (rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Username target tidak ditemukan di database!' });
+      return res.status(404).json({ success: false, message: `Username '${username}' tidak ditemukan di database!` });
     }
 
     await pool.query('DELETE FROM users WHERE username = ?', [username]);
     res.json({ success: true, message: `Akun '${username}' berhasil dihapus secara permanen dari database!` });
   } catch (err) {
+    console.error('Delete User Error:', err);
     res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
   }
 });
