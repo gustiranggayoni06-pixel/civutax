@@ -75,32 +75,16 @@ async function ensureTablesExist() {
   await pool.query(createChatsTable);
   await pool.query(createPendingSalesTable);
 
-  // MIGRASI OTOMATIS KOLOM TABEL USERS & GLOBAL CHATS
-  try {
-    await pool.query('ALTER TABLE users MODIFY COLUMN email VARCHAR(100) NULL DEFAULT NULL');
-  } catch (e) {}
-
-  try {
-    await pool.query('ALTER TABLE users ADD COLUMN status VARCHAR(20) DEFAULT "active"');
-  } catch (e) {}
-
-  try {
-    await pool.query('ALTER TABLE users ADD COLUMN created_by VARCHAR(50) DEFAULT "system"');
-  } catch (e) {}
-
-  try {
-    await pool.query('ALTER TABLE global_chats ADD COLUMN reply_to JSON NULL');
-  } catch (e) {}
+  try { await pool.query('ALTER TABLE users MODIFY COLUMN email VARCHAR(100) NULL DEFAULT NULL'); } catch (e) {}
+  try { await pool.query('ALTER TABLE users ADD COLUMN status VARCHAR(20) DEFAULT "active"'); } catch (e) {}
+  try { await pool.query('ALTER TABLE users ADD COLUMN created_by VARCHAR(50) DEFAULT "system"'); } catch (e) {}
+  try { await pool.query('ALTER TABLE global_chats ADD COLUMN reply_to JSON NULL'); } catch (e) {}
 }
 
 // Helper Kirim Pesan Telegram
 async function sendTelegramMessage(chatId, text, replyMarkup = null) {
   try {
-    const payload = {
-      chat_id: chatId,
-      text: text,
-      parse_mode: 'Markdown'
-    };
+    const payload = { chat_id: chatId, text: text, parse_mode: 'Markdown' };
     if (replyMarkup) payload.reply_markup = replyMarkup;
 
     await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
@@ -202,7 +186,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// Endpoint Ambil Seluruh User Database (Khusus Tab Bar Developer)
+// Endpoint Ambil Seluruh User Database
 app.get('/api/users/all', async (req, res) => {
   try {
     await ensureTablesExist();
@@ -213,7 +197,7 @@ app.get('/api/users/all', async (req, res) => {
   }
 });
 
-// Endpoint Ubah Password / Edit User
+// Endpoint Ubah Password
 app.post('/api/users/change-password', async (req, res) => {
   const { username, oldPassword, newPassword, requested_by, requested_role } = req.body;
 
@@ -223,7 +207,6 @@ app.post('/api/users/change-password', async (req, res) => {
 
   try {
     await ensureTablesExist();
-
     const [rows] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
 
     if (rows.length === 0) {
@@ -238,16 +221,11 @@ app.post('/api/users/change-password', async (req, res) => {
     const hasPrivilege = ['ranzz', 'developer', 'reseller', 'partner', 'owner', 'own', 'full up'].some(r => reqRole.includes(r) || reqUser === 'ranzz');
 
     if (isSelfChange && !hasPrivilege) {
-      if (!oldPassword) {
-        return res.status(400).json({ success: false, message: 'Password lama wajib diisi!' });
-      }
-      if (targetUser.password !== oldPassword) {
-        return res.status(400).json({ success: false, message: 'Password saat ini (password lama) salah!' });
-      }
+      if (!oldPassword) return res.status(400).json({ success: false, message: 'Password lama wajib diisi!' });
+      if (targetUser.password !== oldPassword) return res.status(400).json({ success: false, message: 'Password saat ini (password lama) salah!' });
     }
 
     await pool.query('UPDATE users SET password = ? WHERE username = ?', [newPassword, username]);
-
     res.json({ success: true, message: `Password untuk akun '${username}' berhasil diperbarui!` });
   } catch (err) {
     console.error('Change Password Error:', err);
@@ -255,21 +233,16 @@ app.post('/api/users/change-password', async (req, res) => {
   }
 });
 
-// Endpoint Hapus Akun Permanen dari Database (Khusus Developer Panel)
+// Endpoint Hapus Akun
 app.post('/api/users/delete', async (req, res) => {
   const { username } = req.body;
-
-  if (!username) {
-    return res.status(400).json({ success: false, message: 'Username target wajib diisi!' });
-  }
+  if (!username) return res.status(400).json({ success: false, message: 'Username target wajib diisi!' });
 
   try {
     await ensureTablesExist();
     const [rows] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
 
-    if (rows.length === 0) {
-      return res.status(404).json({ success: false, message: `Username '${username}' tidak ditemukan di database!` });
-    }
+    if (rows.length === 0) return res.status(404).json({ success: false, message: `Username '${username}' tidak ditemukan di database!` });
 
     await pool.query('DELETE FROM users WHERE username = ?', [username]);
     res.json({ success: true, message: `Akun '${username}' berhasil dihapus secara permanen dari database!` });
@@ -295,7 +268,7 @@ app.get('/api/users/check-username', async (req, res) => {
   }
 });
 
-// Pengajuan Akun Baru (Pending ACC)
+// Pengajuan Akun Baru
 app.post('/api/sales/request-approval', async (req, res) => {
   const { created_by, creator_role, buyer_username, buyer_password, package_name, package_price, tax_amount } = req.body;
 
@@ -309,13 +282,8 @@ app.post('/api/sales/request-approval', async (req, res) => {
 
     sendTelegramNotification({
       id: result.insertId,
-      created_by,
-      creator_role,
-      buyer_username,
-      buyer_password,
-      package_name,
-      package_price,
-      tax_amount
+      created_by, creator_role, buyer_username, buyer_password,
+      package_name, package_price, tax_amount
     });
 
     res.json({ success: true, message: 'Berhasil dikirim ke antrean ACC Developer & Telegram!' });
@@ -324,21 +292,18 @@ app.post('/api/sales/request-approval', async (req, res) => {
   }
 });
 
-// =========================================================================
-// 📌 FIX UTAMA: MENGAMBIL SELURUH PENJUALAN (PENDING, APPROVED, REJECTED)
-// =========================================================================
+// Ambil Seluruh Penjualan (Pending, Approved, Rejected)
 app.get('/api/sales/pending-list', async (req, res) => {
   try {
     await ensureTablesExist();
-    // Mengambil SELURUH riwayat transaksi penjualan agar status ACC & Nominal Rupiah bisa dihitung
     const [rows] = await pool.query('SELECT * FROM pending_sales ORDER BY id DESC');
-    res.json({ success: true, requests: rows });
+    res.json({ success: true, requests: rows, data: rows, sales: rows, list: rows, result: rows });
   } catch (err) {
     res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
   }
 });
 
-// Eksekusi ACC / Reject Web (Dengan Proteksi Fallback Query)
+// Eksekusi ACC / Reject Web
 app.post('/api/sales/approve', async (req, res) => {
   const { requestId, action } = req.body;
 
@@ -369,7 +334,7 @@ app.post('/api/sales/approve', async (req, res) => {
           [reqData.buyer_username, generatedEmail, reqData.buyer_password, reqData.package_name, reqData.created_by]
         );
       } catch (insertErr) {
-        console.warn('Gagal insert lengkap, menjalankan fallback query:', insertErr.message);
+        console.warn('Gagal insert lengkap, fallback query:', insertErr.message);
         await pool.query(
           'INSERT INTO users (username, password, role) VALUES (?, ?, ?)', 
           [reqData.buyer_username, reqData.buyer_password, reqData.package_name]
@@ -395,7 +360,6 @@ app.post('/api/telegram/webhook', async (req, res) => {
   try {
     await ensureTablesExist();
 
-    // 1. PENANGANAN BOT COMMANDS
     if (message && message.text) {
       const chatId = String(message.chat.id);
       const text = message.text.trim();
@@ -408,8 +372,8 @@ app.post('/api/telegram/webhook', async (req, res) => {
       if (text === '/start' || text === '/menu') {
         const startMenu = 
           `👑 *BOT KONTROL PANEL CIVUTAX DEVELOPER*\n\n` +
-          `Halo Developer *Ranzz*! Selamat datang di bot manajemen sistem CIVUTAX.\n\n` +
-          `*Daftar Perintah (Commands):*\n` +
+          `Halo Developer *Ranzz*!\n\n` +
+          `*Daftar Perintah:*\n` +
           `• /pending - Cek antrean akun butuh ACC\n` +
           `• /stats - Cek statistik total user & penjualan\n` +
           `• /clearchat - Bersihkan seluruh Chat Global\n` +
@@ -426,13 +390,10 @@ app.post('/api/telegram/webhook', async (req, res) => {
         await sendTelegramMessage(chatId, startMenu, keyboard);
       } else if (text === '/pending') {
         const [rows] = await pool.query('SELECT * FROM pending_sales WHERE status = "pending_approval" ORDER BY id DESC');
-
         if (rows.length === 0) {
           await sendTelegramMessage(chatId, "✅ Tidak ada antrean pengajuan akun baru saat ini.");
         } else {
-          for (const pendingData of rows) {
-            await sendTelegramNotification(pendingData);
-          }
+          for (const pendingData of rows) await sendTelegramNotification(pendingData);
         }
       } else if (text === '/stats') {
         const [usersCount] = await pool.query('SELECT COUNT(*) as total FROM users');
@@ -448,13 +409,12 @@ app.post('/api/telegram/webhook', async (req, res) => {
         await sendTelegramMessage(chatId, statsMsg);
       } else if (text === '/clearchat') {
         await pool.query('DELETE FROM global_chats');
-        await sendTelegramMessage(chatId, "🗑️ *Seluruh riwayat Chat Global di database MySQL berhasil dibersihkan!*");
+        await sendTelegramMessage(chatId, "🗑️ *Seluruh riwayat Chat Global berhasil dibersihkan!*");
       } else if (text === '/help') {
         await sendTelegramMessage(chatId, "ℹ️ *Panduan:* Gunakan tombol interaktif atau ketik /start untuk membuka kontrol panel utama.");
       }
     }
 
-    // 2. PENANGANAN KLIK TOMBOL INTERAKTIF (CALLBACK QUERY TOMBOL ACC/REJECT TELEGRAM)
     if (callback_query) {
       const data = callback_query.data;
       const chatId = callback_query.message.chat.id;
@@ -472,8 +432,7 @@ app.post('/api/telegram/webhook', async (req, res) => {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                chat_id: chatId,
-                message_id: messageId,
+                chat_id: chatId, message_id: messageId,
                 text: `⚠️ *PENGAJUAN INI SUDAH PERNAH DIPROSES SEBELUMNYA!*`,
                 parse_mode: 'Markdown'
               })
@@ -500,15 +459,13 @@ app.post('/api/telegram/webhook', async (req, res) => {
               }
             }
             
-            // Ubah status ke approved di database MySQL
             await pool.query('UPDATE pending_sales SET status = "approved" WHERE id = ?', [requestId]);
 
             await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                chat_id: chatId,
-                message_id: messageId,
+                chat_id: chatId, message_id: messageId,
                 text: `✅ *AKUN BERHASIL DI-ACC & AKTIF!*\n\n• Username: \`${reqData.buyer_username}\`\n• Password: \`${reqData.buyer_password}\`\n• Paket: ${reqData.package_name}\n• Diproses oleh: Developer Ranzz (via Telegram)`,
                 parse_mode: 'Markdown'
               })
@@ -520,8 +477,7 @@ app.post('/api/telegram/webhook', async (req, res) => {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                chat_id: chatId,
-                message_id: messageId,
+                chat_id: chatId, message_id: messageId,
                 text: `❌ *PENGAJUAN DITOLAK!*\n\n• Username: \`${reqData.buyer_username}\``,
                 parse_mode: 'Markdown'
               })
@@ -533,9 +489,7 @@ app.post('/api/telegram/webhook', async (req, res) => {
         if (rows.length === 0) {
           await sendTelegramMessage(chatId, "✅ Tidak ada antrean pengajuan akun baru saat ini.");
         } else {
-          for (const pendingData of rows) {
-            await sendTelegramNotification(pendingData);
-          }
+          for (const pendingData of rows) await sendTelegramNotification(pendingData);
         }
       } else if (data === 'cmd_stats') {
         const [usersCount] = await pool.query('SELECT COUNT(*) as total FROM users');
@@ -551,7 +505,7 @@ app.post('/api/telegram/webhook', async (req, res) => {
         await sendTelegramMessage(chatId, statsMsg);
       } else if (data === 'cmd_clear_chat') {
         await pool.query('DELETE FROM global_chats');
-        await sendTelegramMessage(chatId, "🗑️ *Seluruh riwayat Chat Global di database MySQL berhasil dibersihkan!*");
+        await sendTelegramMessage(chatId, "🗑️ *Seluruh riwayat Chat Global berhasil dibersihkan!*");
       }
     }
   } catch (err) {
@@ -561,17 +515,35 @@ app.post('/api/telegram/webhook', async (req, res) => {
   res.sendStatus(200);
 });
 
-// Chat Global Endpoints
-app.get('/api/chat/messages', async (req, res) => {
+// =========================================================================
+// 📌 CHAT GLOBAL ENDPOINTS — FIX KOMPATIBEL DENGAN dashboard.html
+// =========================================================================
+
+// ✅ GET /api/chat/list → dipakai oleh dashboard.html (loadGlobalChats)
+// ✅ GET /api/chat/messages → alias lama, tetap dipertahankan
+async function handleGetChatList(req, res) {
   try {
     await ensureTablesExist();
     const [rows] = await pool.query('SELECT * FROM global_chats ORDER BY id DESC LIMIT 50');
-    res.json({ success: true, messages: rows.reverse() });
+    const messages = rows.reverse();
+    // Balikin multi-key supaya frontend versi manapun tetap bisa baca
+    res.json({
+      success: true,
+      messages: messages,
+      chats: messages,
+      data: messages,
+      list: messages,
+      result: messages
+    });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
+    res.status(500).json({ success: false, message: 'DB Error: ' + err.message, messages: [], chats: [], data: [] });
   }
-});
+}
 
+app.get('/api/chat/list', handleGetChatList);
+app.get('/api/chat/messages', handleGetChatList);
+
+// ✅ POST /api/chat/send → dipakai dashboard.html
 app.post('/api/chat/send', async (req, res) => {
   const { username, message, reply_to } = req.body;
   if (!username || !message) return res.status(400).json({ success: false, message: 'Username dan pesan wajib diisi!' });
@@ -592,8 +564,10 @@ app.post('/api/chat/send', async (req, res) => {
   }
 });
 
-app.delete('/api/chat/clear', async (req, res) => {
-  const { username } = req.body;
+// ✅ POST /api/chat/clear → dipakai dashboard.html (clearAllChatsByDev)
+// ✅ DELETE /api/chat/clear → alias lama, tetap dipertahankan
+async function handleClearChat(req, res) {
+  const username = (req.body && req.body.username) || req.query.username;
 
   if (!username || username.toLowerCase() !== 'ranzz') {
     return res.status(403).json({ success: false, message: 'Akses ditolak! Hanya Ranzz yang dapat membersihkan chat.' });
@@ -602,10 +576,20 @@ app.delete('/api/chat/clear', async (req, res) => {
   try {
     await ensureTablesExist();
     await pool.query('DELETE FROM global_chats');
-    res.json({ success: true, message: 'Seluruh riwayat chat di database berhasil dibersihkan!' });
+    res.json({ success: true, message: 'Seluruh riwayat chat berhasil dibersihkan!' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
   }
+}
+
+app.post('/api/chat/clear', handleClearChat);
+app.delete('/api/chat/clear', handleClearChat);
+
+// =========================================================================
+// 📌 FALLBACK / HEALTH CHECK — biar frontend gak nyangkut kalau ada route salah
+// =========================================================================
+app.use((req, res) => {
+  res.status(404).json({ success: false, message: `Endpoint ${req.method} ${req.originalUrl} tidak ditemukan di server.` });
 });
 
 const PORT = process.env.PORT || 3000;
