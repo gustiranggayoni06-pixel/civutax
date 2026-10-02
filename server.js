@@ -30,7 +30,9 @@ const pool = mysql.createPool({
   connectTimeout: 10000
 });
 
-// Helper untuk memastikan tabel-tabel penting dibuat & migrasi kolom otomatis
+// =========================================================================
+// 📌 HELPER: PASTIKAN TABEL ADA + MIGRASI OTOMATIS
+// =========================================================================
 async function ensureTablesExist() {
   const createUsersTable = `
     CREATE TABLE IF NOT EXISTS users (
@@ -42,6 +44,7 @@ async function ensureTablesExist() {
       avatar_url TEXT,
       created_by VARCHAR(50) DEFAULT 'system',
       status VARCHAR(20) DEFAULT 'active',
+      connected_senders INT DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `;
@@ -71,17 +74,34 @@ async function ensureTablesExist() {
     )
   `;
 
+  const createWaPairingsTable = `
+    CREATE TABLE IF NOT EXISTS wa_pairings (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      username VARCHAR(50) NOT NULL,
+      phone_number VARCHAR(20) NOT NULL,
+      pairing_token VARCHAR(64) NOT NULL UNIQUE,
+      status VARCHAR(20) DEFAULT 'active',
+      paired_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY unique_user (username)
+    )
+  `;
+
   await pool.query(createUsersTable);
   await pool.query(createChatsTable);
   await pool.query(createPendingSalesTable);
+  await pool.query(createWaPairingsTable);
 
+  // Migrasi kolom otomatis (abaikan error kalau sudah ada)
   try { await pool.query('ALTER TABLE users MODIFY COLUMN email VARCHAR(100) NULL DEFAULT NULL'); } catch (e) {}
   try { await pool.query('ALTER TABLE users ADD COLUMN status VARCHAR(20) DEFAULT "active"'); } catch (e) {}
   try { await pool.query('ALTER TABLE users ADD COLUMN created_by VARCHAR(50) DEFAULT "system"'); } catch (e) {}
+  try { await pool.query('ALTER TABLE users ADD COLUMN connected_senders INT DEFAULT 0'); } catch (e) {}
   try { await pool.query('ALTER TABLE global_chats ADD COLUMN reply_to JSON NULL'); } catch (e) {}
 }
 
-// Helper Kirim Pesan Telegram
+// =========================================================================
+// 📌 HELPER TELEGRAM
+// =========================================================================
 async function sendTelegramMessage(chatId, text, replyMarkup = null) {
   try {
     const payload = { chat_id: chatId, text: text, parse_mode: 'Markdown' };
@@ -97,7 +117,6 @@ async function sendTelegramMessage(chatId, text, replyMarkup = null) {
   }
 }
 
-// Fungsi Kirim Notifikasi Pengajuan Akun Baru
 async function sendTelegramNotification(pendingData) {
   const messageText = 
     `⚡ *PENGAJUAN AKUN BARU (NEED ACC)* ⚡\n\n` +
@@ -121,7 +140,9 @@ async function sendTelegramNotification(pendingData) {
   await sendTelegramMessage(DEV_CHAT_ID, messageText, replyMarkup);
 }
 
-// Root Route Test
+// =========================================================================
+// 📌 ROOT ROUTE
+// =========================================================================
 app.get('/', (req, res) => {
   res.send('Server Backend CIVUTAX Berjalan Lancar!');
 });
@@ -138,7 +159,9 @@ app.get('/api/telegram/set-webhook', async (req, res) => {
   }
 });
 
-// Endpoint Login
+// =========================================================================
+// 📌 AUTH: LOGIN & REGISTER
+// =========================================================================
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ success: false, message: 'Username dan password wajib diisi!' });
@@ -160,7 +183,9 @@ app.post('/api/login', async (req, res) => {
         username: user.username,
         email: user.email || '',
         role: user.username.toLowerCase() === 'ranzz' ? 'Ranzz : DEVELOPER' : (user.role || 'User'),
-        avatar_url: user.avatar_url || 'https://cdn.phototourl.com/member/2026-09-27-bfb1146c-714f-4bca-97ff-7eb50e41818b.jpg'
+        avatar_url: user.avatar_url || 'https://cdn.phototourl.com/member/2026-09-27-bfb1146c-714f-4bca-97ff-7eb50e41818b.jpg',
+        connected_senders: user.connected_senders || 0,
+        created_at: user.created_at
       }
     });
   } catch (err) {
@@ -168,7 +193,6 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// Endpoint Register
 app.post('/api/register', async (req, res) => {
   const { username, email, password } = req.body;
   if (!username || !password) return res.status(400).json({ success: false, message: 'Username dan password wajib diisi!' });
@@ -186,18 +210,19 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// Endpoint Ambil Seluruh User Database
+// =========================================================================
+// 📌 USER MANAGEMENT
+// =========================================================================
 app.get('/api/users/all', async (req, res) => {
   try {
     await ensureTablesExist();
-    const [rows] = await pool.query('SELECT id, username, password, role, created_by, status, created_at FROM users ORDER BY id DESC');
+    const [rows] = await pool.query('SELECT id, username, password, role, created_by, status, connected_senders, created_at FROM users ORDER BY id DESC');
     res.json({ success: true, users: rows });
   } catch (err) {
     res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
   }
 });
 
-// Endpoint Ubah Password
 app.post('/api/users/change-password', async (req, res) => {
   const { username, oldPassword, newPassword, requested_by, requested_role } = req.body;
 
@@ -233,7 +258,6 @@ app.post('/api/users/change-password', async (req, res) => {
   }
 });
 
-// Endpoint Hapus Akun
 app.post('/api/users/delete', async (req, res) => {
   const { username } = req.body;
   if (!username) return res.status(400).json({ success: false, message: 'Username target wajib diisi!' });
@@ -252,7 +276,6 @@ app.post('/api/users/delete', async (req, res) => {
   }
 });
 
-// Cek Username Duplikat
 app.get('/api/users/check-username', async (req, res) => {
   const { username } = req.query;
   if (!username) return res.json({ exists: false });
@@ -268,7 +291,9 @@ app.get('/api/users/check-username', async (req, res) => {
   }
 });
 
-// Pengajuan Akun Baru
+// =========================================================================
+// 📌 SALES / PENJUALAN
+// =========================================================================
 app.post('/api/sales/request-approval', async (req, res) => {
   const { created_by, creator_role, buyer_username, buyer_password, package_name, package_price, tax_amount } = req.body;
 
@@ -292,7 +317,6 @@ app.post('/api/sales/request-approval', async (req, res) => {
   }
 });
 
-// Ambil Seluruh Penjualan (Pending, Approved, Rejected)
 app.get('/api/sales/pending-list', async (req, res) => {
   try {
     await ensureTablesExist();
@@ -303,11 +327,7 @@ app.get('/api/sales/pending-list', async (req, res) => {
   }
 });
 
-// =========================================================================
-// 📌 ENDPOINT HAPUS LOG SALES / ACC (BARU - UNTUK admin-acc.html)
-// =========================================================================
-
-// ✅ Hapus 1 log pengajuan berdasarkan ID
+// Hapus 1 log pengajuan
 app.post('/api/sales/delete', async (req, res) => {
   const { requestId, requested_by } = req.body;
 
@@ -331,7 +351,7 @@ app.post('/api/sales/delete', async (req, res) => {
   }
 });
 
-// ✅ Hapus SEMUA log pengajuan (khusus Ranzz)
+// Hapus SEMUA log pengajuan (khusus Ranzz)
 app.post('/api/sales/delete-all', async (req, res) => {
   const { requested_by } = req.body;
 
@@ -349,7 +369,6 @@ app.post('/api/sales/delete-all', async (req, res) => {
   }
 });
 
-// Eksekusi ACC / Reject Web
 app.post('/api/sales/approve', async (req, res) => {
   const { requestId, action } = req.body;
 
@@ -399,7 +418,160 @@ app.post('/api/sales/approve', async (req, res) => {
   }
 });
 
-// WEBHOOK TELEGRAM LENGKAP
+// =========================================================================
+// 📌 WHATSAPP PAIRING VIA TERMUX — ENDPOINT BARU
+// =========================================================================
+
+// ✅ Dipanggil dari SCRIPT TERMUX setelah berhasil pairing
+app.post('/api/whatsapp/register-paired', async (req, res) => {
+  const { username, phone_number, pairing_token, paired_at } = req.body;
+
+  if (!username || !phone_number || !pairing_token) {
+    return res.status(400).json({ success: false, message: 'Data tidak lengkap! (username, phone_number, pairing_token wajib)' });
+  }
+
+  if (String(pairing_token).length < 20) {
+    return res.status(400).json({ success: false, message: 'Format token tidak valid!' });
+  }
+
+  // Normalisasi nomor (harus format 62xxx)
+  let cleanPhone = String(phone_number).replace(/\D/g, '');
+  if (cleanPhone.startsWith('0')) cleanPhone = '62' + cleanPhone.slice(1);
+  if (cleanPhone.startsWith('8')) cleanPhone = '62' + cleanPhone;
+
+  try {
+    await ensureTablesExist();
+
+    // Simpan/update pairing
+    await pool.query(
+      `INSERT INTO wa_pairings (username, phone_number, pairing_token, status)
+       VALUES (?, ?, ?, 'active')
+       ON DUPLICATE KEY UPDATE 
+         phone_number = VALUES(phone_number),
+         pairing_token = VALUES(pairing_token),
+         status = 'active',
+         paired_at = CURRENT_TIMESTAMP`,
+      [username, cleanPhone, pairing_token]
+    );
+
+    // Increment connected_senders
+    await pool.query(
+      'UPDATE users SET connected_senders = COALESCE(connected_senders, 0) + 1 WHERE username = ?',
+      [username]
+    ).catch(() => {});
+
+    console.log(`[TERMUX PAIRING] ✅ ${username} - ${cleanPhone} tersambung`);
+
+    // Notif ke Developer Ranzz
+    sendTelegramMessage(
+      DEV_CHAT_ID,
+      `📲 *PAIRING BARU VIA TERMUX*\n\n` +
+      `• User: *${username}*\n` +
+      `• Nomor: \`${cleanPhone}\`\n` +
+      `• Token: \`${pairing_token.substring(0, 12)}...\`\n` +
+      `• Waktu: ${new Date().toLocaleString('id-ID')}`
+    ).catch(() => {});
+
+    res.json({
+      success: true,
+      message: 'Pairing tercatat di server!',
+      phone: cleanPhone
+    });
+  } catch (err) {
+    console.error('Register paired error:', err);
+    res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
+  }
+});
+
+// ✅ Dipanggil dari DASHBOARD untuk verifikasi token
+app.post('/api/whatsapp/verify-pairing', async (req, res) => {
+  const { username, pairing_token } = req.body;
+
+  if (!username || !pairing_token) {
+    return res.status(400).json({ success: false, message: 'username & pairing_token wajib!' });
+  }
+
+  try {
+    await ensureTablesExist();
+    const [rows] = await pool.query(
+      'SELECT * FROM wa_pairings WHERE pairing_token = ? AND status = "active"',
+      [pairing_token]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Token tidak valid / sudah expired / belum tercatat di server!' });
+    }
+
+    const pairing = rows[0];
+
+    // Update username kalau beda (token milik user lain yang coba akses)
+    if (pairing.username !== username) {
+      await pool.query('UPDATE wa_pairings SET username = ? WHERE id = ?', [username, pairing.id]);
+    }
+
+    res.json({
+      success: true,
+      message: 'Token valid!',
+      phone_number: pairing.phone_number,
+      paired_at: pairing.paired_at,
+      username: pairing.username
+    });
+  } catch (err) {
+    console.error('Verify pairing error:', err);
+    res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
+  }
+});
+
+// ✅ Dipanggil dari dashboard untuk putuskan perangkat
+app.post('/api/whatsapp/unpair', async (req, res) => {
+  const { username } = req.body;
+  if (!username) return res.status(400).json({ success: false, message: 'username wajib!' });
+
+  try {
+    await ensureTablesExist();
+    await pool.query('UPDATE wa_pairings SET status = "disconnected" WHERE username = ?', [username]);
+    await pool.query(
+      'UPDATE users SET connected_senders = GREATEST(COALESCE(connected_senders,0) - 1, 0) WHERE username = ?',
+      [username]
+    ).catch(() => {});
+
+    console.log(`[TERMUX PAIRING] ⛔ ${username} diputuskan`);
+
+    res.json({ success: true, message: 'Perangkat berhasil diputuskan.' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
+  }
+});
+
+// ✅ Cek status pairing (opsional, buat frontend polling manual)
+app.get('/api/whatsapp/pair-status', async (req, res) => {
+  const { username } = req.query;
+  if (!username) return res.status(400).json({ success: false, message: 'username wajib!' });
+
+  try {
+    await ensureTablesExist();
+    const [rows] = await pool.query('SELECT * FROM wa_pairings WHERE username = ? LIMIT 1', [username]);
+
+    if (rows.length === 0) {
+      return res.json({ success: true, status: 'not_found', connected: false });
+    }
+
+    const data = rows[0];
+    res.json({
+      success: true,
+      status: data.status,
+      connected: data.status === 'active',
+      phone: data.phone_number,
+      paired_at: data.paired_at
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
+  }
+});
+
+// =========================================================================
+// 📌 TELEGRAM WEBHOOK
+// =========================================================================
 app.post('/api/telegram/webhook', async (req, res) => {
   const { message, callback_query } = req.body;
 
@@ -424,12 +596,14 @@ app.post('/api/telegram/webhook', async (req, res) => {
           `• /stats - Cek statistik total user & penjualan\n` +
           `• /clearchat - Bersihkan seluruh Chat Global\n` +
           `• /clearlogs - Hapus SEMUA log pengajuan ACC\n` +
+          `• /wapairing - Cek semua user WA yang tersambung\n` +
           `• /help - Bantuan & panduan bot`;
 
         const keyboard = {
           inline_keyboard: [
             [{ text: '📋 Cek Antrean ACC', callback_data: 'cmd_pending' }],
             [{ text: '📊 Statistik Sistem', callback_data: 'cmd_stats' }],
+            [{ text: '📲 WA Tersambung', callback_data: 'cmd_wa_list' }],
             [{ text: '🗑️ Bersihkan Chat Global', callback_data: 'cmd_clear_chat' }],
             [{ text: '💥 Hapus Semua Log ACC', callback_data: 'cmd_clear_logs' }]
           ]
@@ -448,15 +622,29 @@ app.post('/api/telegram/webhook', async (req, res) => {
         const [pendingCount] = await pool.query('SELECT COUNT(*) as total FROM pending_sales WHERE status = "pending_approval"');
         const [approvedCount] = await pool.query('SELECT COUNT(*) as total FROM pending_sales WHERE status = "approved"');
         const [totalLogs] = await pool.query('SELECT COUNT(*) as total FROM pending_sales');
+        const [waCount] = await pool.query('SELECT COUNT(*) as total FROM wa_pairings WHERE status = "active"');
 
         const statsMsg = 
           `📊 *STATISTIK SISTEM CIVUTAX*\n\n` +
           `• Total Akun Terdaftar: *${usersCount[0].total}*\n` +
           `• Total Akun Di-ACC: *${approvedCount[0].total}*\n` +
           `• Antrean Menunggu ACC: *${pendingCount[0].total}*\n` +
-          `• Total Log Tersimpan: *${totalLogs[0].total}*`;
+          `• Total Log Tersimpan: *${totalLogs[0].total}*\n` +
+          `• WA Pairing Aktif: *${waCount[0].total}*`;
 
         await sendTelegramMessage(chatId, statsMsg);
+      } else if (text === '/wapairing') {
+        const [rows] = await pool.query('SELECT * FROM wa_pairings WHERE status = "active" ORDER BY paired_at DESC LIMIT 20');
+
+        if (rows.length === 0) {
+          await sendTelegramMessage(chatId, "📭 Belum ada user yang pairing WA via Termux.");
+        } else {
+          let listText = `📲 *DAFTAR WA PAIRING AKTIF* (${rows.length})\n\n`;
+          rows.forEach((w, i) => {
+            listText += `${i + 1}. *${w.username}*\n   • Nomor: \`${w.phone_number}\`\n   • Pairing: ${new Date(w.paired_at).toLocaleString('id-ID')}\n\n`;
+          });
+          await sendTelegramMessage(chatId, listText);
+        }
       } else if (text === '/clearchat') {
         await pool.query('DELETE FROM global_chats');
         await sendTelegramMessage(chatId, "🗑️ *Seluruh riwayat Chat Global berhasil dibersihkan!*");
@@ -549,15 +737,29 @@ app.post('/api/telegram/webhook', async (req, res) => {
         const [pendingCount] = await pool.query('SELECT COUNT(*) as total FROM pending_sales WHERE status = "pending_approval"');
         const [approvedCount] = await pool.query('SELECT COUNT(*) as total FROM pending_sales WHERE status = "approved"');
         const [totalLogs] = await pool.query('SELECT COUNT(*) as total FROM pending_sales');
+        const [waCount] = await pool.query('SELECT COUNT(*) as total FROM wa_pairings WHERE status = "active"');
 
         const statsMsg = 
           `📊 *STATISTIK SISTEM CIVUTAX*\n\n` +
           `• Total Akun Terdaftar: *${usersCount[0].total}*\n` +
           `• Total Akun Di-ACC: *${approvedCount[0].total}*\n` +
           `• Antrean Menunggu ACC: *${pendingCount[0].total}*\n` +
-          `• Total Log Tersimpan: *${totalLogs[0].total}*`;
+          `• Total Log Tersimpan: *${totalLogs[0].total}*\n` +
+          `• WA Pairing Aktif: *${waCount[0].total}*`;
 
         await sendTelegramMessage(chatId, statsMsg);
+      } else if (data === 'cmd_wa_list') {
+        const [rows] = await pool.query('SELECT * FROM wa_pairings WHERE status = "active" ORDER BY paired_at DESC LIMIT 20');
+
+        if (rows.length === 0) {
+          await sendTelegramMessage(chatId, "📭 Belum ada user yang pairing WA via Termux.");
+        } else {
+          let listText = `📲 *DAFTAR WA PAIRING AKTIF* (${rows.length})\n\n`;
+          rows.forEach((w, i) => {
+            listText += `${i + 1}. *${w.username}*\n   • Nomor: \`${w.phone_number}\`\n   • Pairing: ${new Date(w.paired_at).toLocaleString('id-ID')}\n\n`;
+          });
+          await sendTelegramMessage(chatId, listText);
+        }
       } else if (data === 'cmd_clear_chat') {
         await pool.query('DELETE FROM global_chats');
         await sendTelegramMessage(chatId, "🗑️ *Seluruh riwayat Chat Global berhasil dibersihkan!*");
