@@ -115,7 +115,6 @@ async function ensureTablesExist() {
       full_price INT DEFAULT 0,
       buyer_username VARCHAR(50) NOT NULL,
       buyer_password VARCHAR(255) NOT NULL,
-      buyer_email VARCHAR(100),
       buyer_contact VARCHAR(30),
       status VARCHAR(20) DEFAULT 'pending',
       payment_data JSON,
@@ -141,6 +140,8 @@ async function ensureTablesExist() {
   try { await pool.query('ALTER TABLE pakasir_transactions ADD COLUMN selected_days INT DEFAULT 1'); } catch (e) {}
   try { await pool.query('ALTER TABLE pakasir_transactions ADD COLUMN old_price INT DEFAULT 0'); } catch (e) {}
   try { await pool.query('ALTER TABLE pakasir_transactions ADD COLUMN full_price INT DEFAULT 0'); } catch (e) {}
+  // Drop kolom buyer_email kalau masih ada (cleanup)
+  try { await pool.query('ALTER TABLE pakasir_transactions DROP COLUMN buyer_email'); } catch (e) {}
 }
 
 // =========================================================================
@@ -214,9 +215,9 @@ app.post('/api/login', async (req, res) => {
 
   try {
     await ensureTablesExist();
-    const [rows] = await pool.query('SELECT * FROM users WHERE username = ? OR email = ?', [username, username]);
+    const [rows] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
 
-    if (rows.length === 0) return res.status(401).json({ success: false, message: 'Username / Email tidak ditemukan!' });
+    if (rows.length === 0) return res.status(401).json({ success: false, message: 'Username tidak ditemukan!' });
 
     const user = rows[0];
     if (user.password !== password) return res.status(401).json({ success: false, message: 'Password salah!' });
@@ -227,7 +228,6 @@ app.post('/api/login', async (req, res) => {
       user: {
         id: user.id,
         username: user.username,
-        email: user.email || '',
         role: user.username.toLowerCase() === 'ranzz' ? 'Ranzz : DEVELOPER' : (user.role || 'User'),
         avatar_url: user.avatar_url || 'https://cdn.phototourl.com/member/2026-09-27-bfb1146c-714f-4bca-97ff-7eb50e41818b.jpg',
         connected_senders: user.connected_senders || 0,
@@ -240,16 +240,17 @@ app.post('/api/login', async (req, res) => {
 });
 
 app.post('/api/register', async (req, res) => {
-  const { username, email, password } = req.body;
+  const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ success: false, message: 'Username dan password wajib diisi!' });
 
   try {
     await ensureTablesExist();
-    const [existing] = await pool.query('SELECT * FROM users WHERE username = ? OR email = ?', [username, email || '']);
+    const [existing] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
 
-    if (existing.length > 0) return res.status(400).json({ success: false, message: 'Username atau Email sudah terdaftar!' });
+    if (existing.length > 0) return res.status(400).json({ success: false, message: 'Username sudah terdaftar!' });
 
-    await pool.query('INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)', [username, email || null, password, 'User']);
+    const generatedEmail = `${username.toLowerCase()}@civutax.com`;
+    await pool.query('INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)', [username, generatedEmail, password, 'User']);
     res.json({ success: true, message: 'Pendaftaran akun berhasil! Silakan login.' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
@@ -505,19 +506,19 @@ app.post('/api/pakasir/create', async (req, res) => {
     const finalOldPrice = Number(old_price) || 0;
     const finalFullPrice = Number(full_price) || Number(amount) || 0;
 
-    // Simpan transaksi ke DB (dengan kolom tambahan)
+    // Simpan transaksi ke DB (tanpa kolom email)
     await pool.query(
       `INSERT INTO pakasir_transactions 
         (txn_id, order_id, type, package_id, package_name, amount, fee, total_payment, payment_method,
          selected_days, old_price, full_price,
-         buyer_username, buyer_password, buyer_email, buyer_contact, status, payment_data)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+         buyer_username, buyer_password, buyer_contact, status, payment_data)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
       [
         pakasirData.txn_id, order_id, type, package_id, package_name, amount,
         pakasirData.fee || 0, pakasirData.total_payment || amount,
         method,
         finalSelectedDays, finalOldPrice, finalFullPrice,
-        buyer.username, buyer.password, buyer.email || null, buyer.contact || null,
+        buyer.username, buyer.password, buyer.contact || null,
         JSON.stringify(pakasirData)
       ]
     );
@@ -683,34 +684,20 @@ async function autoCreateUserFromTxn(txn) {
       let expDays = 0; // 0 = permanen/Unlimited
 
       if (txn.package_id === 'harian') {
-        // Ambil jumlah hari dari selected_days (fallback ke 1)
         const days = parseInt(txn.selected_days) || 1;
-        const clampedDays = Math.min(Math.max(days, 1), 5); // batasi 1-5
+        const clampedDays = Math.min(Math.max(days, 1), 5);
         role = `Harian (${clampedDays} Hari)`;
         expDays = clampedDays;
       }
-      else if (txn.package_id === 'mingguan') {
-        role = 'Mingguan';
-        expDays = 7;
-      }
-      else if (txn.package_id === 'bulanan') {
-        role = 'Bulanan';
-        expDays = 30;
-      }
-      else if (txn.package_id === 'fullup') {
-        role = 'Full Up';
-      }
-      else if (txn.package_id === 'reseller') {
-        role = 'Reseller';
-      }
-      else if (txn.package_id === 'partner') {
-        role = 'Partner';
-      }
-      else if (txn.package_id === 'owner') {
-        role = 'Owner (Own)';
-      }
+      else if (txn.package_id === 'mingguan') { role = 'Mingguan'; expDays = 7; }
+      else if (txn.package_id === 'bulanan') { role = 'Bulanan'; expDays = 30; }
+      else if (txn.package_id === 'fullup') { role = 'Full Up'; }
+      else if (txn.package_id === 'reseller') { role = 'Reseller'; }
+      else if (txn.package_id === 'partner') { role = 'Partner'; }
+      else if (txn.package_id === 'owner') { role = 'Owner (Own)'; }
 
-      const generatedEmail = txn.buyer_email || `${txn.buyer_username.toLowerCase()}@civutax.com`;
+      // Auto-generate email (user gak perlu input)
+      const generatedEmail = `${txn.buyer_username.toLowerCase()}@civutax.com`;
 
       await pool.query(
         `INSERT INTO users (username, email, password, role, created_by, status) 
