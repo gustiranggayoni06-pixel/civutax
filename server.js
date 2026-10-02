@@ -303,6 +303,52 @@ app.get('/api/sales/pending-list', async (req, res) => {
   }
 });
 
+// =========================================================================
+// 📌 ENDPOINT HAPUS LOG SALES / ACC (BARU - UNTUK admin-acc.html)
+// =========================================================================
+
+// ✅ Hapus 1 log pengajuan berdasarkan ID
+app.post('/api/sales/delete', async (req, res) => {
+  const { requestId, requested_by } = req.body;
+
+  if (!requestId) {
+    return res.status(400).json({ success: false, message: 'requestId wajib diisi!' });
+  }
+
+  try {
+    await ensureTablesExist();
+
+    const [rows] = await pool.query('SELECT id FROM pending_sales WHERE id = ?', [requestId]);
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: `Log dengan ID #${requestId} tidak ditemukan!` });
+    }
+
+    await pool.query('DELETE FROM pending_sales WHERE id = ?', [requestId]);
+    res.json({ success: true, message: `Log #${requestId} berhasil dihapus!` });
+  } catch (err) {
+    console.error('Delete sales log error:', err);
+    res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
+  }
+});
+
+// ✅ Hapus SEMUA log pengajuan (khusus Ranzz)
+app.post('/api/sales/delete-all', async (req, res) => {
+  const { requested_by } = req.body;
+
+  if (!requested_by || String(requested_by).toLowerCase() !== 'ranzz') {
+    return res.status(403).json({ success: false, message: 'Akses ditolak! Hanya Ranzz yang bisa menghapus semua log.' });
+  }
+
+  try {
+    await ensureTablesExist();
+    const [result] = await pool.query('DELETE FROM pending_sales');
+    res.json({ success: true, message: `Semua log berhasil dihapus (${result.affectedRows} entri)!`, affected: result.affectedRows });
+  } catch (err) {
+    console.error('Delete all sales log error:', err);
+    res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
+  }
+});
+
 // Eksekusi ACC / Reject Web
 app.post('/api/sales/approve', async (req, res) => {
   const { requestId, action } = req.body;
@@ -377,13 +423,15 @@ app.post('/api/telegram/webhook', async (req, res) => {
           `• /pending - Cek antrean akun butuh ACC\n` +
           `• /stats - Cek statistik total user & penjualan\n` +
           `• /clearchat - Bersihkan seluruh Chat Global\n` +
+          `• /clearlogs - Hapus SEMUA log pengajuan ACC\n` +
           `• /help - Bantuan & panduan bot`;
 
         const keyboard = {
           inline_keyboard: [
             [{ text: '📋 Cek Antrean ACC', callback_data: 'cmd_pending' }],
             [{ text: '📊 Statistik Sistem', callback_data: 'cmd_stats' }],
-            [{ text: '🗑️ Bersihkan Chat Global', callback_data: 'cmd_clear_chat' }]
+            [{ text: '🗑️ Bersihkan Chat Global', callback_data: 'cmd_clear_chat' }],
+            [{ text: '💥 Hapus Semua Log ACC', callback_data: 'cmd_clear_logs' }]
           ]
         };
 
@@ -399,17 +447,22 @@ app.post('/api/telegram/webhook', async (req, res) => {
         const [usersCount] = await pool.query('SELECT COUNT(*) as total FROM users');
         const [pendingCount] = await pool.query('SELECT COUNT(*) as total FROM pending_sales WHERE status = "pending_approval"');
         const [approvedCount] = await pool.query('SELECT COUNT(*) as total FROM pending_sales WHERE status = "approved"');
+        const [totalLogs] = await pool.query('SELECT COUNT(*) as total FROM pending_sales');
 
         const statsMsg = 
           `📊 *STATISTIK SISTEM CIVUTAX*\n\n` +
           `• Total Akun Terdaftar: *${usersCount[0].total}*\n` +
           `• Total Akun Di-ACC: *${approvedCount[0].total}*\n` +
-          `• Antrean Menunggu ACC: *${pendingCount[0].total}*`;
+          `• Antrean Menunggu ACC: *${pendingCount[0].total}*\n` +
+          `• Total Log Tersimpan: *${totalLogs[0].total}*`;
 
         await sendTelegramMessage(chatId, statsMsg);
       } else if (text === '/clearchat') {
         await pool.query('DELETE FROM global_chats');
         await sendTelegramMessage(chatId, "🗑️ *Seluruh riwayat Chat Global berhasil dibersihkan!*");
+      } else if (text === '/clearlogs') {
+        const [result] = await pool.query('DELETE FROM pending_sales');
+        await sendTelegramMessage(chatId, `💥 *SEMUA LOG PENGAJUAN ACC BERHASIL DIHAPUS!*\n\nTotal log yang dihapus: *${result.affectedRows}* entri.`);
       } else if (text === '/help') {
         await sendTelegramMessage(chatId, "ℹ️ *Panduan:* Gunakan tombol interaktif atau ketik /start untuk membuka kontrol panel utama.");
       }
@@ -495,17 +548,22 @@ app.post('/api/telegram/webhook', async (req, res) => {
         const [usersCount] = await pool.query('SELECT COUNT(*) as total FROM users');
         const [pendingCount] = await pool.query('SELECT COUNT(*) as total FROM pending_sales WHERE status = "pending_approval"');
         const [approvedCount] = await pool.query('SELECT COUNT(*) as total FROM pending_sales WHERE status = "approved"');
+        const [totalLogs] = await pool.query('SELECT COUNT(*) as total FROM pending_sales');
 
         const statsMsg = 
           `📊 *STATISTIK SISTEM CIVUTAX*\n\n` +
           `• Total Akun Terdaftar: *${usersCount[0].total}*\n` +
           `• Total Akun Di-ACC: *${approvedCount[0].total}*\n` +
-          `• Antrean Menunggu ACC: *${pendingCount[0].total}*`;
+          `• Antrean Menunggu ACC: *${pendingCount[0].total}*\n` +
+          `• Total Log Tersimpan: *${totalLogs[0].total}*`;
 
         await sendTelegramMessage(chatId, statsMsg);
       } else if (data === 'cmd_clear_chat') {
         await pool.query('DELETE FROM global_chats');
         await sendTelegramMessage(chatId, "🗑️ *Seluruh riwayat Chat Global berhasil dibersihkan!*");
+      } else if (data === 'cmd_clear_logs') {
+        const [result] = await pool.query('DELETE FROM pending_sales');
+        await sendTelegramMessage(chatId, `💥 *SEMUA LOG PENGAJUAN ACC BERHASIL DIHAPUS!*\n\nTotal log yang dihapus: *${result.affectedRows}* entri.`);
       }
     }
   } catch (err) {
@@ -516,17 +574,14 @@ app.post('/api/telegram/webhook', async (req, res) => {
 });
 
 // =========================================================================
-// 📌 CHAT GLOBAL ENDPOINTS — FIX KOMPATIBEL DENGAN dashboard.html
+// 📌 CHAT GLOBAL ENDPOINTS
 // =========================================================================
 
-// ✅ GET /api/chat/list → dipakai oleh dashboard.html (loadGlobalChats)
-// ✅ GET /api/chat/messages → alias lama, tetap dipertahankan
 async function handleGetChatList(req, res) {
   try {
     await ensureTablesExist();
     const [rows] = await pool.query('SELECT * FROM global_chats ORDER BY id DESC LIMIT 50');
     const messages = rows.reverse();
-    // Balikin multi-key supaya frontend versi manapun tetap bisa baca
     res.json({
       success: true,
       messages: messages,
@@ -543,7 +598,6 @@ async function handleGetChatList(req, res) {
 app.get('/api/chat/list', handleGetChatList);
 app.get('/api/chat/messages', handleGetChatList);
 
-// ✅ POST /api/chat/send → dipakai dashboard.html
 app.post('/api/chat/send', async (req, res) => {
   const { username, message, reply_to } = req.body;
   if (!username || !message) return res.status(400).json({ success: false, message: 'Username dan pesan wajib diisi!' });
@@ -564,8 +618,6 @@ app.post('/api/chat/send', async (req, res) => {
   }
 });
 
-// ✅ POST /api/chat/clear → dipakai dashboard.html (clearAllChatsByDev)
-// ✅ DELETE /api/chat/clear → alias lama, tetap dipertahankan
 async function handleClearChat(req, res) {
   const username = (req.body && req.body.username) || req.query.username;
 
@@ -586,7 +638,7 @@ app.post('/api/chat/clear', handleClearChat);
 app.delete('/api/chat/clear', handleClearChat);
 
 // =========================================================================
-// 📌 FALLBACK / HEALTH CHECK — biar frontend gak nyangkut kalau ada route salah
+// 📌 FALLBACK 404
 // =========================================================================
 app.use((req, res) => {
   res.status(404).json({ success: false, message: `Endpoint ${req.method} ${req.originalUrl} tidak ditemukan di server.` });
