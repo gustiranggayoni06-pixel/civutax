@@ -19,7 +19,7 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8563757113:AAG1gW-
 const DEV_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '5474893948';
 
 // =========================================================================
-// 📌 KONFIGURASI PAKASIR PAYMENT GATEWAY
+// 📌 KONFIGURASI PAKASIR
 // =========================================================================
 const PAKASIR_SLUG = process.env.PAKASIR_SLUG || 'ranzz-digital';
 const PAKASIR_API_KEY = process.env.PAKASIR_API_KEY || '2i31X6c9lLZURpm35lE74rcCzrFPJ9l9';
@@ -27,7 +27,7 @@ const PAKASIR_WEBHOOK_SECRET = process.env.PAKASIR_WEBHOOK_SECRET || '0d5564bdf2
 const PAKASIR_BASE_URL = 'https://app.pakasir.com/api/v2';
 
 // =========================================================================
-// 📌 KONFIGURASI DATABASE MYSQL
+// 📌 KONFIGURASI DATABASE
 // =========================================================================
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
@@ -54,10 +54,12 @@ async function ensureTablesExist() {
       password VARCHAR(255) NOT NULL,
       role VARCHAR(50) DEFAULT 'User',
       avatar_url TEXT,
+      display_name VARCHAR(50) NULL,
       created_by VARCHAR(50) DEFAULT 'system',
       status VARCHAR(20) DEFAULT 'active',
       connected_senders INT DEFAULT 0,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
   `;
 
@@ -65,9 +67,21 @@ async function ensureTablesExist() {
     CREATE TABLE IF NOT EXISTS global_chats (
       id INT AUTO_INCREMENT PRIMARY KEY,
       username VARCHAR(50) NOT NULL,
+      role VARCHAR(50) DEFAULT 'User',
       message TEXT NOT NULL,
       reply_to JSON NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
+  const createPinnedChatTable = `
+    CREATE TABLE IF NOT EXISTS pinned_chats (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      username VARCHAR(50) NOT NULL,
+      role VARCHAR(50) DEFAULT 'User',
+      message TEXT NOT NULL,
+      pinned_by VARCHAR(50) NOT NULL,
+      pinned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `;
 
@@ -125,22 +139,23 @@ async function ensureTablesExist() {
 
   await pool.query(createUsersTable);
   await pool.query(createChatsTable);
+  await pool.query(createPinnedChatTable);
   await pool.query(createPendingSalesTable);
   await pool.query(createWaPairingsTable);
   await pool.query(createPakasirTable);
 
-  // Migrasi kolom otomatis (abaikan error kalau sudah ada)
+  // Migrasi kolom otomatis
   try { await pool.query('ALTER TABLE users MODIFY COLUMN email VARCHAR(100) NULL DEFAULT NULL'); } catch (e) {}
   try { await pool.query('ALTER TABLE users ADD COLUMN status VARCHAR(20) DEFAULT "active"'); } catch (e) {}
   try { await pool.query('ALTER TABLE users ADD COLUMN created_by VARCHAR(50) DEFAULT "system"'); } catch (e) {}
   try { await pool.query('ALTER TABLE users ADD COLUMN connected_senders INT DEFAULT 0'); } catch (e) {}
+  try { await pool.query('ALTER TABLE users ADD COLUMN display_name VARCHAR(50) NULL'); } catch (e) {}
+  try { await pool.query('ALTER TABLE users ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'); } catch (e) {}
   try { await pool.query('ALTER TABLE global_chats ADD COLUMN reply_to JSON NULL'); } catch (e) {}
-
-  // Migrasi kolom tambahan untuk pakasir_transactions
+  try { await pool.query('ALTER TABLE global_chats ADD COLUMN role VARCHAR(50) DEFAULT "User"'); } catch (e) {}
   try { await pool.query('ALTER TABLE pakasir_transactions ADD COLUMN selected_days INT DEFAULT 1'); } catch (e) {}
   try { await pool.query('ALTER TABLE pakasir_transactions ADD COLUMN old_price INT DEFAULT 0'); } catch (e) {}
   try { await pool.query('ALTER TABLE pakasir_transactions ADD COLUMN full_price INT DEFAULT 0'); } catch (e) {}
-  // Drop kolom buyer_email kalau masih ada (cleanup)
   try { await pool.query('ALTER TABLE pakasir_transactions DROP COLUMN buyer_email'); } catch (e) {}
 }
 
@@ -228,8 +243,9 @@ app.post('/api/login', async (req, res) => {
       user: {
         id: user.id,
         username: user.username,
-        role: user.username.toLowerCase() === 'ranzz' ? 'Ranzz : DEVELOPER' : (user.role || 'User'),
+        role: user.username.toLowerCase() === 'ranzz' ? 'Ranzzz : DEVELOPER' : (user.role || 'User'),
         avatar_url: user.avatar_url || 'https://cdn.phototourl.com/member/2026-09-27-bfb1146c-714f-4bca-97ff-7eb50e41818b.jpg',
+        display_name: user.display_name || null,
         connected_senders: user.connected_senders || 0,
         created_at: user.created_at
       }
@@ -265,6 +281,45 @@ app.get('/api/users/all', async (req, res) => {
     await ensureTablesExist();
     const [rows] = await pool.query('SELECT id, username, password, role, created_by, status, connected_senders, created_at FROM users ORDER BY id DESC');
     res.json({ success: true, users: rows });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
+  }
+});
+
+// Profile endpoint
+app.get('/api/users/profile/:username', async (req, res) => {
+  const { username } = req.params;
+  if (!username) return res.status(400).json({ success: false, message: 'username wajib!' });
+
+  try {
+    await ensureTablesExist();
+    const [rows] = await pool.query('SELECT id, username, role, avatar_url, display_name, created_by, status, connected_senders, created_at FROM users WHERE username = ?', [username]);
+
+    if (rows.length === 0) return res.status(404).json({ success: false, message: 'User tidak ditemukan' });
+
+    res.json({ success: true, user: rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
+  }
+});
+
+// Update profile
+app.post('/api/users/update-profile', async (req, res) => {
+  const { username, display_name, avatar_url } = req.body;
+  if (!username || !display_name) {
+    return res.status(400).json({ success: false, message: 'Username & display_name wajib!' });
+  }
+
+  try {
+    await ensureTablesExist();
+    await pool.query('ALTER TABLE users ADD COLUMN display_name VARCHAR(50) NULL').catch(() => {});
+
+    await pool.query(
+      'UPDATE users SET display_name = ?, avatar_url = COALESCE(?, avatar_url) WHERE username = ?',
+      [display_name, avatar_url || null, username]
+    );
+
+    res.json({ success: true, message: 'Profil berhasil disimpan!' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
   }
@@ -458,8 +513,6 @@ app.post('/api/sales/approve', async (req, res) => {
 // =========================================================================
 // 📌 PAKASIR PAYMENT GATEWAY ENDPOINTS
 // =========================================================================
-
-// ✅ 1. Buat transaksi baru (dipanggil dari index.html)
 app.post('/api/pakasir/create', async (req, res) => {
   const { 
     order_id, type, package_id, package_name, amount, method, buyer,
@@ -473,7 +526,6 @@ app.post('/api/pakasir/create', async (req, res) => {
   try {
     await ensureTablesExist();
 
-    // Cek username sudah ada atau tidak (hanya untuk akun baru)
     if (type === 'new_acc') {
       const [existing] = await pool.query('SELECT id FROM users WHERE username = ?', [buyer.username]);
       if (existing.length > 0) {
@@ -481,7 +533,6 @@ app.post('/api/pakasir/create', async (req, res) => {
       }
     }
 
-    // Panggil API Pakasir v2
     const pakasirRes = await fetch(`${PAKASIR_BASE_URL}/create-transaction/${PAKASIR_SLUG}/${order_id}`, {
       method: 'POST',
       headers: {
@@ -501,12 +552,10 @@ app.post('/api/pakasir/create', async (req, res) => {
       });
     }
 
-    // Ambil nilai tambahan dari request
     const finalSelectedDays = parseInt(selected_days) || 1;
     const finalOldPrice = Number(old_price) || 0;
     const finalFullPrice = Number(full_price) || Number(amount) || 0;
 
-    // Simpan transaksi ke DB (tanpa kolom email)
     await pool.query(
       `INSERT INTO pakasir_transactions 
         (txn_id, order_id, type, package_id, package_name, amount, fee, total_payment, payment_method,
@@ -525,7 +574,6 @@ app.post('/api/pakasir/create', async (req, res) => {
 
     console.log(`[PAKASIR] ✅ Transaksi baru: ${pakasirData.txn_id} - ${buyer.username} - Rp${amount} (${type})`);
 
-    // Notif Telegram transaksi baru
     let infoDurasi = '';
     if (package_id === 'harian' && type === 'new_acc') {
       infoDurasi = `\n• Durasi: *${finalSelectedDays} Hari*`;
@@ -564,7 +612,6 @@ app.post('/api/pakasir/create', async (req, res) => {
   }
 });
 
-// ✅ 2. Cek status transaksi (dipanggil dari polling index.html)
 app.get('/api/pakasir/status/:txn_id', async (req, res) => {
   const { txn_id } = req.params;
 
@@ -578,12 +625,10 @@ app.get('/api/pakasir/status/:txn_id', async (req, res) => {
 
     const localTxn = rows[0];
 
-    // Kalau sudah completed di lokal, langsung return
     if (localTxn.status === 'completed') {
       return res.json({ success: true, status: 'completed', completed_at: localTxn.completed_at });
     }
 
-    // Cek ke Pakasir
     const pakasirRes = await fetch(`${PAKASIR_BASE_URL}/transaction-status/${PAKASIR_SLUG}/${txn_id}`, {
       headers: { 'X-Api-Key': PAKASIR_API_KEY }
     });
@@ -596,7 +641,6 @@ app.get('/api/pakasir/status/:txn_id', async (req, res) => {
       );
 
       if (pakasirData.status === 'completed') {
-        // Ambil data terbaru dari DB (untuk pastikan semua kolom terisi)
         const [freshRows] = await pool.query('SELECT * FROM pakasir_transactions WHERE txn_id = ?', [txn_id]);
         await autoCreateUserFromTxn(freshRows[0]);
       }
@@ -614,12 +658,11 @@ app.get('/api/pakasir/status/:txn_id', async (req, res) => {
   }
 });
 
-// ✅ 3. Webhook dari Pakasir (real-time notif)
 app.post('/api/pakasir/webhook', async (req, res) => {
   const secret = req.headers['x-secret'];
   const { txn_id, order_id, amount, status, completed_at, is_sandbox } = req.body;
 
-  console.log(`[PAKASIR WEBHOOK] txn_id=${txn_id} status=${status} secret=${secret ? 'RECEIVED' : 'MISSING'}`);
+  console.log(`[PAKASIR WEBHOOK] txn_id=${txn_id} status=${status}`);
 
   if (secret !== PAKASIR_WEBHOOK_SECRET) {
     console.warn('[PAKASIR WEBHOOK] ❌ Invalid secret!');
@@ -631,7 +674,7 @@ app.post('/api/pakasir/webhook', async (req, res) => {
 
     const [rows] = await pool.query('SELECT * FROM pakasir_transactions WHERE txn_id = ?', [txn_id]);
     if (rows.length === 0) {
-      console.warn(`[PAKASIR WEBHOOK] ⚠️ Transaksi ${txn_id} tidak ditemukan di DB`);
+      console.warn(`[PAKASIR WEBHOOK] ⚠️ Transaksi ${txn_id} tidak ditemukan`);
       return res.sendStatus(200);
     }
 
@@ -643,14 +686,12 @@ app.post('/api/pakasir/webhook', async (req, res) => {
         [completed_at || new Date(), txn_id]
       );
 
-      // Ambil data terbaru dari DB
       const [freshRows] = await pool.query('SELECT * FROM pakasir_transactions WHERE txn_id = ?', [txn_id]);
       await autoCreateUserFromTxn(freshRows[0]);
 
-      console.log(`[PAKASIR WEBHOOK] ✅ Transaksi ${txn_id} COMPLETED & user auto-created`);
+      console.log(`[PAKASIR WEBHOOK] ✅ Transaksi ${txn_id} COMPLETED`);
     } else if (status === 'canceled') {
       await pool.query('UPDATE pakasir_transactions SET status = "canceled" WHERE txn_id = ?', [txn_id]);
-      console.log(`[PAKASIR WEBHOOK] ⛔ Transaksi ${txn_id} CANCELED`);
     }
 
     res.sendStatus(200);
@@ -660,34 +701,22 @@ app.post('/api/pakasir/webhook', async (req, res) => {
   }
 });
 
-// ✅ 4. Auto-create user setelah pembayaran sukses
 async function autoCreateUserFromTxn(txn) {
   try {
-    if (!txn) {
-      console.error('[AUTO-CREATE] Txn data kosong!');
-      return;
-    }
+    if (!txn) return;
 
     const [existing] = await pool.query('SELECT * FROM users WHERE username = ?', [txn.buyer_username]);
 
     if (txn.type === 'new_acc') {
-      // ============================================================
-      // ==== AKUN BARU ====
-      // ============================================================
-      if (existing.length > 0) {
-        console.log(`[AUTO-CREATE] User ${txn.buyer_username} sudah ada, skip.`);
-        return;
-      }
+      if (existing.length > 0) return;
 
-      // Tentukan role + jumlah hari
       let role = 'User';
-      let expDays = 0; // 0 = permanen/Unlimited
+      let expDays = 0;
 
       if (txn.package_id === 'harian') {
-        const days = parseInt(txn.selected_days) || 1;
-        const clampedDays = Math.min(Math.max(days, 1), 5);
-        role = `Harian (${clampedDays} Hari)`;
-        expDays = clampedDays;
+        const days = Math.min(Math.max(parseInt(txn.selected_days) || 1, 1), 5);
+        role = `Harian (${days} Hari)`;
+        expDays = days;
       }
       else if (txn.package_id === 'mingguan') { role = 'Mingguan'; expDays = 7; }
       else if (txn.package_id === 'bulanan') { role = 'Bulanan'; expDays = 30; }
@@ -696,7 +725,6 @@ async function autoCreateUserFromTxn(txn) {
       else if (txn.package_id === 'partner') { role = 'Partner'; }
       else if (txn.package_id === 'owner') { role = 'Owner (Own)'; }
 
-      // Auto-generate email (user gak perlu input)
       const generatedEmail = `${txn.buyer_username.toLowerCase()}@civutax.com`;
 
       await pool.query(
@@ -705,90 +733,41 @@ async function autoCreateUserFromTxn(txn) {
         [txn.buyer_username, generatedEmail, txn.buyer_password, role]
       );
 
-      console.log(`[AUTO-CREATE] ✅ User ${txn.buyer_username} dibuat dengan role "${role}"`);
-
-      // Format info jumlah hari
-      let infoHari = '';
-      if (txn.package_id === 'harian') {
-        const days = parseInt(txn.selected_days) || 1;
-        infoHari = `\n• Durasi: *${Math.min(Math.max(days, 1), 5)} Hari*`;
-      } else if (expDays > 0) {
-        infoHari = `\n• Durasi: *${expDays} Hari*`;
-      } else {
-        infoHari = `\n• Durasi: *Unlimited / Permanen*`;
-      }
-
-      // Notif Telegram
       sendTelegramMessage(
         DEV_CHAT_ID,
         `🎉 *PEMBELIAN AKUN BARU VIA PAKASIR!*\n\n` +
         `• Username: \`${txn.buyer_username}\`\n` +
         `• Password: \`${txn.buyer_password}\`\n` +
-        `• Role: *${role}*${infoHari}\n` +
+        `• Role: *${role}*\n` +
         `• Total: Rp${Number(txn.total_payment || txn.amount).toLocaleString('id-ID')}\n` +
-        `• Metode: ${txn.payment_method}\n` +
         `• Order ID: \`${txn.order_id}\``
       ).catch(() => {});
 
     } else if (txn.type === 'up_role') {
-      // ============================================================
-      // ==== UPGRADE ROLE ====
-      // ============================================================
-      if (existing.length === 0) {
-        console.log(`[AUTO-UPGRADE] User ${txn.buyer_username} tidak ditemukan, skip.`);
-        return;
-      }
+      if (existing.length === 0) return;
 
-      // Tentukan role baru
       let newRole = 'User';
-      if (txn.package_id === 'harian') {
-        const days = parseInt(txn.selected_days) || 1;
-        newRole = `Harian (${Math.min(Math.max(days, 1), 5)} Hari)`;
-      }
-      else if (txn.package_id === 'mingguan') newRole = 'Mingguan';
-      else if (txn.package_id === 'bulanan') newRole = 'Bulanan';
-      else if (txn.package_id === 'fullup') newRole = 'Full Up';
+      if (txn.package_id === 'fullup') newRole = 'Full Up';
       else if (txn.package_id === 'reseller') newRole = 'Reseller';
       else if (txn.package_id === 'partner') newRole = 'Partner';
       else if (txn.package_id === 'owner') newRole = 'Owner (Own)';
 
       const oldRole = existing[0].role;
-
       await pool.query('UPDATE users SET role = ? WHERE username = ?', [newRole, txn.buyer_username]);
 
-      console.log(`[AUTO-UPGRADE] ✅ ${txn.buyer_username}: ${oldRole} → ${newRole}`);
-
-      // Hitung info harga upgrade
-      const oldPrice = Number(txn.old_price) || 0;
-      const fullPrice = Number(txn.full_price) || 0;
-      const payAmount = Number(txn.total_payment || txn.amount) || 0;
-
-      let hargaInfo = '';
-      if (oldPrice > 0 && fullPrice > 0) {
-        hargaInfo = `\n• Harga Role Lama: Rp${oldPrice.toLocaleString('id-ID')}\n` +
-                    `• Harga Role Baru: Rp${fullPrice.toLocaleString('id-ID')}\n` +
-                    `• Selisih Bayar: Rp${(fullPrice - oldPrice).toLocaleString('id-ID')}`;
-      }
-
-      // Notif Telegram
       sendTelegramMessage(
         DEV_CHAT_ID,
         `⬆️ *UPGRADE ROLE VIA PAKASIR!*\n\n` +
         `• Username: \`${txn.buyer_username}\`\n` +
-        `• Role Lama: *${oldRole}*\n` +
-        `• Role Baru: *${newRole}*${hargaInfo}\n` +
-        `• Total Bayar: Rp${payAmount.toLocaleString('id-ID')}\n` +
-        `• Metode: ${txn.payment_method}\n` +
-        `• Order ID: \`${txn.order_id}\``
+        `• Role: *${oldRole}* → *${newRole}*\n` +
+        `• Total: Rp${Number(txn.total_payment || txn.amount).toLocaleString('id-ID')}`
       ).catch(() => {});
     }
-
   } catch (err) {
     console.error('Auto create user error:', err);
   }
 }
 
-// ✅ 5. Cek biaya admin
 app.get('/api/pakasir/fee/:amount', async (req, res) => {
   const { amount } = req.params;
   try {
@@ -800,7 +779,6 @@ app.get('/api/pakasir/fee/:amount', async (req, res) => {
   }
 });
 
-// ✅ 6. Ambil riwayat transaksi Pakasir
 app.get('/api/pakasir/transactions', async (req, res) => {
   try {
     await ensureTablesExist();
@@ -814,16 +792,11 @@ app.get('/api/pakasir/transactions', async (req, res) => {
 // =========================================================================
 // 📌 WHATSAPP PAIRING VIA TERMUX
 // =========================================================================
-
 app.post('/api/whatsapp/register-paired', async (req, res) => {
   const { username, phone_number, pairing_token, paired_at } = req.body;
 
   if (!username || !phone_number || !pairing_token) {
     return res.status(400).json({ success: false, message: 'Data tidak lengkap!' });
-  }
-
-  if (String(pairing_token).length < 20) {
-    return res.status(400).json({ success: false, message: 'Format token tidak valid!' });
   }
 
   let cleanPhone = String(phone_number).replace(/\D/g, '');
@@ -849,29 +822,24 @@ app.post('/api/whatsapp/register-paired', async (req, res) => {
       [username]
     ).catch(() => {});
 
-    console.log(`[TERMUX PAIRING] ✅ ${username} - ${cleanPhone} tersambung`);
-
     sendTelegramMessage(
       DEV_CHAT_ID,
       `📲 *PAIRING BARU VIA TERMUX*\n\n` +
       `• User: *${username}*\n` +
       `• Nomor: \`${cleanPhone}\`\n` +
-      `• Token: \`${pairing_token.substring(0, 12)}...\`\n` +
-      `• Waktu: ${new Date().toLocaleString('id-ID')}`
+      `• Token: \`${pairing_token.substring(0, 12)}...\``
     ).catch(() => {});
 
-    res.json({ success: true, message: 'Pairing tercatat di server!', phone: cleanPhone });
+    res.json({ success: true, message: 'Pairing tercatat!', phone: cleanPhone });
   } catch (err) {
-    console.error('Register paired error:', err);
     res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
   }
 });
 
 app.post('/api/whatsapp/verify-pairing', async (req, res) => {
   const { username, pairing_token } = req.body;
-
   if (!username || !pairing_token) {
-    return res.status(400).json({ success: false, message: 'username & pairing_token wajib!' });
+    return res.status(400).json({ success: false, message: 'Data kurang!' });
   }
 
   try {
@@ -882,11 +850,10 @@ app.post('/api/whatsapp/verify-pairing', async (req, res) => {
     );
 
     if (rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Token tidak valid / sudah expired!' });
+      return res.status(404).json({ success: false, message: 'Token tidak valid / expired!' });
     }
 
     const pairing = rows[0];
-
     if (pairing.username !== username) {
       await pool.query('UPDATE wa_pairings SET username = ? WHERE id = ?', [username, pairing.id]);
     }
@@ -899,7 +866,6 @@ app.post('/api/whatsapp/verify-pairing', async (req, res) => {
       username: pairing.username
     });
   } catch (err) {
-    console.error('Verify pairing error:', err);
     res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
   }
 });
@@ -916,8 +882,7 @@ app.post('/api/whatsapp/unpair', async (req, res) => {
       [username]
     ).catch(() => {});
 
-    console.log(`[TERMUX PAIRING] ⛔ ${username} diputuskan`);
-    res.json({ success: true, message: 'Perangkat berhasil diputuskan.' });
+    res.json({ success: true, message: 'Perangkat diputuskan.' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
   }
@@ -949,7 +914,133 @@ app.get('/api/whatsapp/pair-status', async (req, res) => {
 });
 
 // =========================================================================
-// 📌 TELEGRAM WEBHOOK
+// 📌 CHAT GLOBAL + PINNED
+// =========================================================================
+async function handleGetChatList(req, res) {
+  try {
+    await ensureTablesExist();
+    const [rows] = await pool.query('SELECT * FROM global_chats ORDER BY id DESC LIMIT 50');
+    const messages = rows.reverse();
+    res.json({
+      success: true,
+      messages: messages,
+      chats: messages,
+      data: messages,
+      list: messages,
+      result: messages
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'DB Error: ' + err.message, messages: [] });
+  }
+}
+
+app.get('/api/chat/list', handleGetChatList);
+app.get('/api/chat/messages', handleGetChatList);
+
+app.post('/api/chat/send', async (req, res) => {
+  const { username, role, message, reply_to } = req.body;
+  if (!username || !message) return res.status(400).json({ success: false, message: 'Username dan pesan wajib diisi!' });
+
+  try {
+    await ensureTablesExist();
+    const replyData = reply_to ? JSON.stringify(reply_to) : null;
+
+    // Simpan dengan role
+    try {
+      await pool.query(
+        'INSERT INTO global_chats (username, role, message, reply_to) VALUES (?, ?, ?, ?)',
+        [username, role || 'User', message, replyData]
+      );
+    } catch (insertErr) {
+      // Fallback kalau kolom role belum ada
+      await pool.query('INSERT INTO global_chats (username, message, reply_to) VALUES (?, ?, ?)', [username, message, replyData]);
+    }
+
+    res.json({ success: true, message: 'Pesan terkirim!' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
+  }
+});
+
+// PIN CHAT — hanya DEV
+app.post('/api/chat/pin', async (req, res) => {
+  const { username, message, pinned_by } = req.body;
+  if (!username || !message || !pinned_by) {
+    return res.status(400).json({ success: false, message: 'Data kurang!' });
+  }
+
+  if (pinned_by.toLowerCase() !== 'ranzz') {
+    return res.status(403).json({ success: false, message: 'Hanya Developer yang bisa sematkan pesan!' });
+  }
+
+  try {
+    await ensureTablesExist();
+
+    // Ambil role target user
+    const [users] = await pool.query('SELECT role FROM users WHERE username = ?', [username]);
+    const role = users.length > 0 ? users[0].role : 'User';
+
+    // Hapus pinned lama, ganti dengan yang baru
+    await pool.query('DELETE FROM pinned_chats');
+    await pool.query(
+      'INSERT INTO pinned_chats (username, role, message, pinned_by) VALUES (?, ?, ?, ?)',
+      [username, role, message, pinned_by]
+    );
+
+    res.json({ success: true, message: 'Pesan disematkan!' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
+  }
+});
+
+// GET pinned chat
+app.get('/api/chat/pinned', async (req, res) => {
+  try {
+    await ensureTablesExist();
+    const [rows] = await pool.query('SELECT * FROM pinned_chats ORDER BY id DESC LIMIT 1');
+    res.json({ success: true, pinned: rows[0] || null });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
+  }
+});
+
+// UNPIN chat — hanya DEV
+app.post('/api/chat/unpin', async (req, res) => {
+  const { username } = req.body;
+  if (!username || username.toLowerCase() !== 'ranzz') {
+    return res.status(403).json({ success: false, message: 'Hanya DEV!' });
+  }
+
+  try {
+    await ensureTablesExist();
+    await pool.query('DELETE FROM pinned_chats');
+    res.json({ success: true, message: 'Pinned dihapus!' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
+  }
+});
+
+async function handleClearChat(req, res) {
+  const username = (req.body && req.body.username) || req.query.username;
+
+  if (!username || username.toLowerCase() !== 'ranzz') {
+    return res.status(403).json({ success: false, message: 'Akses ditolak! Hanya Ranzz.' });
+  }
+
+  try {
+    await ensureTablesExist();
+    await pool.query('DELETE FROM global_chats');
+    res.json({ success: true, message: 'Chat dibersihkan!' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
+  }
+}
+
+app.post('/api/chat/clear', handleClearChat);
+app.delete('/api/chat/clear', handleClearChat);
+
+// =========================================================================
+// 📌 TELEGRAM WEBHOOK - BOT COMMANDS
 // =========================================================================
 app.post('/api/telegram/webhook', async (req, res) => {
   const { message, callback_query } = req.body;
@@ -957,104 +1048,411 @@ app.post('/api/telegram/webhook', async (req, res) => {
   try {
     await ensureTablesExist();
 
+    // ============ HANDLE TEXT COMMANDS ============
     if (message && message.text) {
       const chatId = String(message.chat.id);
       const text = message.text.trim();
 
       if (chatId !== DEV_CHAT_ID) {
-        await sendTelegramMessage(chatId, "❌ Akses Ditolak! Anda bukan Developer Ranzz.");
+        await sendTelegramMessage(chatId, "Akses ditolak. Bot ini hanya untuk Developer Ranzz.");
         return res.sendStatus(200);
       }
 
+      // ============ /start & /menu ============
       if (text === '/start' || text === '/menu') {
         const startMenu = 
-          `👑 *BOT KONTROL PANEL CIVUTAX DEVELOPER*\n\n` +
-          `Halo Developer *Ranzz*!\n\n` +
-          `*Daftar Perintah:*\n` +
-          `• /pending - Cek antrean akun butuh ACC\n` +
-          `• /stats - Cek statistik total user & penjualan\n` +
-          `• /clearchat - Bersihkan seluruh Chat Global\n` +
-          `• /clearlogs - Hapus SEMUA log pengajuan ACC\n` +
-          `• /wapairing - Cek semua user WA yang tersambung\n` +
-          `• /pakasir - Cek riwayat transaksi Pakasir\n` +
-          `• /help - Bantuan & panduan bot`;
+          `*BOT KONTROL CIVUTAX*\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+          `Selamat datang, *Developer Ranzz*\n\n` +
+          `*KONTROL SISTEM:*\n` +
+          `/pending - Antrean akun butuh ACC\n` +
+          `/stats - Statistik lengkap sistem\n` +
+          `/users - List semua user terdaftar\n` +
+          `/adduser - Tambah user manual\n` +
+          `/deluser - Hapus user dari database\n` +
+          `/setrole - Ubah role user\n\n` +
+          `*CHAT GLOBAL:*\n` +
+          `/chats - Lihat 20 chat terbaru\n` +
+          `/pin - Sematkan pesan di chat\n` +
+          `/unpin - Hapus pesan sematan\n` +
+          `/clearchat - Bersihkan semua chat\n\n` +
+          `*WA PAIRING:*\n` +
+          `/wapairing - List WA tersambung\n` +
+          `/unpair - Putuskan WA user\n\n` +
+          `*PAKASIR:*\n` +
+          `/pakasir - 10 transaksi terbaru\n` +
+          `/revenue - Total pendapatan\n\n` +
+          `*LOG & BERSIH:*\n` +
+          `/clearlogs - Hapus semua log ACC\n` +
+          `/backup - Backup database info\n\n` +
+          `*INFO:*\n` +
+          `/help - Bantuan lengkap\n` +
+          `/ping - Test respon bot\n` +
+          `/version - Info versi bot`;
 
         const keyboard = {
           inline_keyboard: [
-            [{ text: '📋 Cek Antrean ACC', callback_data: 'cmd_pending' }],
-            [{ text: '📊 Statistik Sistem', callback_data: 'cmd_stats' }],
-            [{ text: '📲 WA Tersambung', callback_data: 'cmd_wa_list' }],
-            [{ text: '💳 Transaksi Pakasir', callback_data: 'cmd_pakasir' }],
-            [{ text: '🗑️ Bersihkan Chat Global', callback_data: 'cmd_clear_chat' }],
-            [{ text: '💥 Hapus Semua Log ACC', callback_data: 'cmd_clear_logs' }]
+            [{ text: 'Antrean ACC', callback_data: 'cmd_pending' }, { text: 'Statistik', callback_data: 'cmd_stats' }],
+            [{ text: 'List User', callback_data: 'cmd_users' }, { text: 'Chat Terbaru', callback_data: 'cmd_chats' }],
+            [{ text: 'WA Pairing', callback_data: 'cmd_wa_list' }, { text: 'Transaksi Pakasir', callback_data: 'cmd_pakasir' }],
+            [{ text: 'Revenue', callback_data: 'cmd_revenue' }],
+            [{ text: 'Bersihkan Chat', callback_data: 'cmd_clear_chat' }, { text: 'Bersihkan Log', callback_data: 'cmd_clear_logs' }],
+            [{ text: 'Ping', callback_data: 'cmd_ping' }, { text: 'Bantuan', callback_data: 'cmd_help' }]
           ]
         };
 
         await sendTelegramMessage(chatId, startMenu, keyboard);
-      } else if (text === '/pending') {
+      }
+
+      // ============ /ping ============
+      else if (text === '/ping') {
+        const start = Date.now();
+        await pool.query('SELECT 1');
+        const latency = Date.now() - start;
+        await sendTelegramMessage(chatId, `Pong!\n\nLatency: *${latency}ms*\nBot aktif 24/7`);
+      }
+
+      // ============ /version ============
+      else if (text === '/version') {
+        await sendTelegramMessage(chatId, 
+          `*CIVUTAX BOT VERSION*\n\n` +
+          `• Bot Version: *1.0.0*\n` +
+          `• Node Environment: *${process.env.NODE_ENV || 'production'}*\n` +
+          `• Pakasir Slug: *${PAKASIR_SLUG}*\n` +
+          `• Uptime: *${Math.floor(process.uptime())} detik*\n` +
+          `• Memory: *${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB*`
+        );
+      }
+
+      // ============ /help ============
+      else if (text === '/help') {
+        await sendTelegramMessage(chatId,
+          `*PANDUAN BOT CIVUTAX*\n\n` +
+          `Bot ini untuk mengelola sistem CIVUTAX:\n` +
+          `• index.html → Halaman login & pembelian\n` +
+          `• dashboard.html → Panel user\n` +
+          `• admin-acc.html → Panel ACC Developer\n\n` +
+          `*Cara Pakai:*\n` +
+          `1. Ketik /start untuk buka menu\n` +
+          `2. Klik tombol interaktif\n` +
+          `3. Atau ketik command langsung\n\n` +
+          `*Link Aplikasi:*\n` +
+          `• Dashboard: https://civutax-s9zn.vercel.app\n` +
+          `• Webhook Pakasir: https://civutax-s9zn.vercel.app/api/pakasir/webhook`
+        );
+      }
+
+      // ============ /pending ============
+      else if (text === '/pending') {
         const [rows] = await pool.query('SELECT * FROM pending_sales WHERE status = "pending_approval" ORDER BY id DESC');
         if (rows.length === 0) {
-          await sendTelegramMessage(chatId, "✅ Tidak ada antrean pengajuan akun baru saat ini.");
+          await sendTelegramMessage(chatId, "Tidak ada antrean pengajuan akun baru.");
         } else {
           for (const pendingData of rows) await sendTelegramNotification(pendingData);
         }
-      } else if (text === '/stats') {
+      }
+
+      // ============ /stats ============
+      else if (text === '/stats') {
         const [usersCount] = await pool.query('SELECT COUNT(*) as total FROM users');
         const [pendingCount] = await pool.query('SELECT COUNT(*) as total FROM pending_sales WHERE status = "pending_approval"');
         const [approvedCount] = await pool.query('SELECT COUNT(*) as total FROM pending_sales WHERE status = "approved"');
-        const [totalLogs] = await pool.query('SELECT COUNT(*) as total FROM pending_sales');
+        const [rejectedCount] = await pool.query('SELECT COUNT(*) as total FROM pending_sales WHERE status = "rejected"');
         const [waCount] = await pool.query('SELECT COUNT(*) as total FROM wa_pairings WHERE status = "active"');
-        const [pakasirCount] = await pool.query('SELECT COUNT(*) as total FROM pakasir_transactions WHERE status = "completed"');
+        const [pakasirSuccess] = await pool.query('SELECT COUNT(*) as total FROM pakasir_transactions WHERE status = "completed"');
+        const [chatCount] = await pool.query('SELECT COUNT(*) as total FROM global_chats');
+        const [revenue] = await pool.query('SELECT SUM(total_payment) as total FROM pakasir_transactions WHERE status = "completed"');
 
         const statsMsg = 
-          `📊 *STATISTIK SISTEM CIVUTAX*\n\n` +
-          `• Total Akun Terdaftar: *${usersCount[0].total}*\n` +
+          `*STATISTIK SISTEM CIVUTAX*\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+          `*USER & AKUN:*\n` +
+          `• Total User Terdaftar: *${usersCount[0].total}*\n` +
           `• Total Akun Di-ACC: *${approvedCount[0].total}*\n` +
-          `• Antrean Menunggu ACC: *${pendingCount[0].total}*\n` +
-          `• Total Log Tersimpan: *${totalLogs[0].total}*\n` +
+          `• Antrean Menunggu: *${pendingCount[0].total}*\n` +
+          `• Akun Ditolak: *${rejectedCount[0].total}*\n\n` +
+          `*AKTIVITAS:*\n` +
           `• WA Pairing Aktif: *${waCount[0].total}*\n` +
-          `• Transaksi Pakasir Sukses: *${pakasirCount[0].total}*`;
+          `• Total Pesan Chat: *${chatCount[0].total}*\n` +
+          `• Transaksi Pakasir Sukses: *${pakasirSuccess[0].total}*\n\n` +
+          `*KEUANGAN:*\n` +
+          `• Total Revenue: *Rp${Number(revenue[0].total || 0).toLocaleString('id-ID')}*\n\n` +
+          `Update: ${new Date().toLocaleString('id-ID')}`;
 
         await sendTelegramMessage(chatId, statsMsg);
-      } else if (text === '/wapairing') {
+      }
+
+      // ============ /users ============
+      else if (text === '/users') {
+        const [rows] = await pool.query('SELECT username, role, created_at FROM users ORDER BY id DESC LIMIT 30');
+        if (rows.length === 0) {
+          await sendTelegramMessage(chatId, "Belum ada user terdaftar.");
+        } else {
+          let listText = `*LIST USER TERDAFTAR (30 terbaru)*\n\n`;
+          rows.forEach((u, i) => {
+            listText += `${i + 1}. *${u.username}* — ${u.role}\n`;
+          });
+          listText += `\nTotal: ${rows.length} ditampilkan`;
+          await sendTelegramMessage(chatId, listText);
+        }
+      }
+
+      // ============ /adduser ============
+      else if (text.startsWith('/adduser')) {
+        const parts = text.split(' ');
+        if (parts.length < 3) {
+          await sendTelegramMessage(chatId, 
+            `*Cara Pakai:*\n` +
+            `/adduser username password [role]\n\n` +
+            `Contoh:\n` +
+            `/adduser budi123 rahasia456 User\n` +
+            `/adduser sultan1 pass123 Owner (Own)`
+          );
+        } else {
+          const username = parts[1].trim();
+          const password = parts[2].trim();
+          const role = parts.slice(3).join(' ').trim() || 'User';
+
+          const [existing] = await pool.query('SELECT id FROM users WHERE username = ?', [username]);
+          if (existing.length > 0) {
+            await sendTelegramMessage(chatId, `Username *${username}* sudah terdaftar.`);
+          } else {
+            const generatedEmail = `${username.toLowerCase()}@civutax.com`;
+            await pool.query(
+              'INSERT INTO users (username, email, password, role, created_by, status) VALUES (?, ?, ?, ?, "telegram-bot", "active")',
+              [username, generatedEmail, password, role]
+            );
+            await sendTelegramMessage(chatId, 
+              `User berhasil ditambahkan:\n\n` +
+              `• Username: \`${username}\`\n` +
+              `• Password: \`${password}\`\n` +
+              `• Role: *${role}*`
+            );
+          }
+        }
+      }
+
+      // ============ /deluser ============
+      else if (text.startsWith('/deluser')) {
+        const parts = text.split(' ');
+        if (parts.length < 2) {
+          await sendTelegramMessage(chatId, 'Cara pakai: `/deluser username`');
+        } else {
+          const username = parts[1].trim();
+          if (username.toLowerCase() === 'ranzz') {
+            await sendTelegramMessage(chatId, 'Tidak bisa hapus akun Developer!');
+          } else {
+            const [existing] = await pool.query('SELECT id FROM users WHERE username = ?', [username]);
+            if (existing.length === 0) {
+              await sendTelegramMessage(chatId, `User *${username}* tidak ditemukan.`);
+            } else {
+              await pool.query('DELETE FROM users WHERE username = ?', [username]);
+              await sendTelegramMessage(chatId, `User *${username}* berhasil dihapus.`);
+            }
+          }
+        }
+      }
+
+      // ============ /setrole ============
+      else if (text.startsWith('/setrole')) {
+        const parts = text.split(' ');
+        if (parts.length < 3) {
+          await sendTelegramMessage(chatId, 
+            '*Cara Pakai:*\n' +
+            `/setrole username role_baru\n\n` +
+            `Contoh:\n` +
+            `/setrole budi123 Owner (Own)\n` +
+            `/setrole sultan1 Full Up`
+          );
+        } else {
+          const username = parts[1].trim();
+          const newRole = parts.slice(2).join(' ').trim();
+
+          const [existing] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
+          if (existing.length === 0) {
+            await sendTelegramMessage(chatId, `User *${username}* tidak ditemukan.`);
+          } else {
+            const oldRole = existing[0].role;
+            await pool.query('UPDATE users SET role = ? WHERE username = ?', [newRole, username]);
+            await sendTelegramMessage(chatId, 
+              `Role diubah:\n\n` +
+              `• User: \`${username}\`\n` +
+              `• Lama: *${oldRole}*\n` +
+              `• Baru: *${newRole}*`
+            );
+          }
+        }
+      }
+
+      // ============ /chats ============
+      else if (text === '/chats') {
+        const [rows] = await pool.query('SELECT username, role, message, created_at FROM global_chats ORDER BY id DESC LIMIT 20');
+        if (rows.length === 0) {
+          await sendTelegramMessage(chatId, "Belum ada pesan chat.");
+        } else {
+          let listText = `*20 CHAT TERBARU*\n\n`;
+          rows.reverse().forEach((c) => {
+            listText += `[${c.role || 'User'}] *${c.username}*: ${c.message}\n`;
+          });
+          await sendTelegramMessage(chatId, listText);
+        }
+      }
+
+      // ============ /pin ============
+      else if (text.startsWith('/pin')) {
+        const parts = text.split(' ');
+        if (parts.length < 3) {
+          await sendTelegramMessage(chatId, 
+            '*Cara Pakai:*\n' +
+            `/pin username pesan\n\n` +
+            `Contoh:\n` +
+            `/pin ranzz Halo semua! Ini pesan sematan\n` +
+            `/pin budi123 Jangan lupa bayar ya`
+          );
+        } else {
+          const targetUser = parts[1].trim();
+          const pinMessage = parts.slice(2).join(' ').trim();
+
+          const [users] = await pool.query('SELECT role FROM users WHERE username = ?', [targetUser]);
+          if (users.length === 0) {
+            await sendTelegramMessage(chatId, `User *${targetUser}* tidak ditemukan.`);
+          } else {
+            const role = users[0].role;
+            await pool.query('DELETE FROM pinned_chats');
+            await pool.query(
+              'INSERT INTO pinned_chats (username, role, message, pinned_by) VALUES (?, ?, ?, ?)',
+              [targetUser, role, pinMessage, 'ranzz']
+            );
+            await sendTelegramMessage(chatId, 
+              `Pesan disematkan:\n\n` +
+              `• User: *${targetUser}* (${role})\n` +
+              `• Pesan: ${pinMessage}`
+            );
+          }
+        }
+      }
+
+      // ============ /unpin ============
+      else if (text === '/unpin') {
+        await pool.query('DELETE FROM pinned_chats');
+        await sendTelegramMessage(chatId, "Pesan sematan dihapus.");
+      }
+
+      // ============ /clearchat ============
+      else if (text === '/clearchat') {
+        const [result] = await pool.query('DELETE FROM global_chats');
+        await sendTelegramMessage(chatId, `Chat global dibersihkan. (${result.affectedRows} pesan dihapus)`);
+      }
+
+      // ============ /wapairing ============
+      else if (text === '/wapairing') {
         const [rows] = await pool.query('SELECT * FROM wa_pairings WHERE status = "active" ORDER BY paired_at DESC LIMIT 20');
         if (rows.length === 0) {
-          await sendTelegramMessage(chatId, "📭 Belum ada user yang pairing WA via Termux.");
+          await sendTelegramMessage(chatId, "Belum ada user pairing WA.");
         } else {
-          let listText = `📲 *DAFTAR WA PAIRING AKTIF* (${rows.length})\n\n`;
+          let listText = `*WA PAIRING AKTIF (${rows.length})*\n\n`;
           rows.forEach((w, i) => {
-            listText += `${i + 1}. *${w.username}*\n   • Nomor: \`${w.phone_number}\`\n   • Pairing: ${new Date(w.paired_at).toLocaleString('id-ID')}\n\n`;
+            listText += `${i + 1}. *${w.username}*\n   Nomor: \`${w.phone_number}\`\n   Tanggal: ${new Date(w.paired_at).toLocaleString('id-ID')}\n\n`;
           });
           await sendTelegramMessage(chatId, listText);
         }
-      } else if (text === '/pakasir') {
+      }
+
+      // ============ /unpair ============
+      else if (text.startsWith('/unpair')) {
+        const parts = text.split(' ');
+        if (parts.length < 2) {
+          await sendTelegramMessage(chatId, 'Cara pakai: `/unpair username`');
+        } else {
+          const username = parts[1].trim();
+          await pool.query('UPDATE wa_pairings SET status = "disconnected" WHERE username = ?', [username]);
+          await pool.query(
+            'UPDATE users SET connected_senders = GREATEST(COALESCE(connected_senders,0) - 1, 0) WHERE username = ?',
+            [username]
+          ).catch(() => {});
+          await sendTelegramMessage(chatId, `WA user *${username}* diputuskan.`);
+        }
+      }
+
+      // ============ /pakasir ============
+      else if (text === '/pakasir') {
         const [rows] = await pool.query('SELECT * FROM pakasir_transactions ORDER BY id DESC LIMIT 10');
         if (rows.length === 0) {
-          await sendTelegramMessage(chatId, "💳 Belum ada transaksi Pakasir.");
+          await sendTelegramMessage(chatId, "Belum ada transaksi Pakasir.");
         } else {
-          let listText = `💳 *10 TRANSAKSI PAKASIR TERBARU*\n\n`;
+          let listText = `*10 TRANSAKSI PAKASIR TERBARU*\n\n`;
           rows.forEach((t, i) => {
-            const emoji = t.status === 'completed' ? '✅' : (t.status === 'pending' ? '⏳' : '❌');
-            listText += `${i + 1}. ${emoji} *${t.buyer_username}*\n   • ${t.package_name} • Rp${Number(t.amount).toLocaleString('id-ID')}\n   • ${t.payment_method} • \`${t.txn_id}\`\n\n`;
+            const statusIcon = t.status === 'completed' ? '[OK]' : (t.status === 'pending' ? '[PENDING]' : '[X]');
+            listText += `${i + 1}. ${statusIcon} *${t.buyer_username}*\n   ${t.package_name} - Rp${Number(t.amount).toLocaleString('id-ID')}\n   Txn: \`${t.txn_id}\`\n\n`;
           });
           await sendTelegramMessage(chatId, listText);
         }
-      } else if (text === '/clearchat') {
-        await pool.query('DELETE FROM global_chats');
-        await sendTelegramMessage(chatId, "🗑️ *Seluruh riwayat Chat Global berhasil dibersihkan!*");
-      } else if (text === '/clearlogs') {
+      }
+
+      // ============ /revenue ============
+      else if (text === '/revenue') {
+        const [total] = await pool.query('SELECT SUM(total_payment) as total, COUNT(*) as count FROM pakasir_transactions WHERE status = "completed"');
+        const [today] = await pool.query('SELECT SUM(total_payment) as total, COUNT(*) as count FROM pakasir_transactions WHERE status = "completed" AND DATE(completed_at) = CURDATE()');
+        const [month] = await pool.query('SELECT SUM(total_payment) as total, COUNT(*) as count FROM pakasir_transactions WHERE status = "completed" AND MONTH(completed_at) = MONTH(CURDATE()) AND YEAR(completed_at) = YEAR(CURDATE())');
+
+        await sendTelegramMessage(chatId,
+          `*LAPORAN REVENUE*\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+          `*Total Keseluruhan:*\n` +
+          `• Rp${Number(total[0].total || 0).toLocaleString('id-ID')}\n` +
+          `• Dari ${total[0].count} transaksi\n\n` +
+          `*Hari Ini:*\n` +
+          `• Rp${Number(today[0].total || 0).toLocaleString('id-ID')}\n` +
+          `• Dari ${today[0].count} transaksi\n\n` +
+          `*Bulan Ini:*\n` +
+          `• Rp${Number(month[0].total || 0).toLocaleString('id-ID')}\n` +
+          `• Dari ${month[0].count} transaksi`
+        );
+      }
+
+      // ============ /clearlogs ============
+      else if (text === '/clearlogs') {
         const [result] = await pool.query('DELETE FROM pending_sales');
-        await sendTelegramMessage(chatId, `💥 *SEMUA LOG PENGAJUAN ACC BERHASIL DIHAPUS!*\n\nTotal log yang dihapus: *${result.affectedRows}* entri.`);
-      } else if (text === '/help') {
-        await sendTelegramMessage(chatId, "ℹ️ *Panduan:* Gunakan tombol interaktif atau ketik /start untuk membuka kontrol panel utama.");
+        await sendTelegramMessage(chatId, `Semua log pengajuan dihapus. (${result.affectedRows} entri)`);
+      }
+
+      // ============ /backup ============
+      else if (text === '/backup') {
+        const [users] = await pool.query('SELECT COUNT(*) as c FROM users');
+        const [chats] = await pool.query('SELECT COUNT(*) as c FROM global_chats');
+        const [pins] = await pool.query('SELECT COUNT(*) as c FROM pinned_chats');
+        const [sales] = await pool.query('SELECT COUNT(*) as c FROM pending_sales');
+        const [wa] = await pool.query('SELECT COUNT(*) as c FROM wa_pairings');
+        const [pakasir] = await pool.query('SELECT COUNT(*) as c FROM pakasir_transactions');
+
+        await sendTelegramMessage(chatId,
+          `*DATABASE INFO*\n\n` +
+          `• Users: ${users[0].c}\n` +
+          `• Chats: ${chats[0].c}\n` +
+          `• Pinned: ${pins[0].c}\n` +
+          `• Sales Log: ${sales[0].c}\n` +
+          `• WA Pairings: ${wa[0].c}\n` +
+          `• Pakasir Txn: ${pakasir[0].c}\n\n` +
+          `Server uptime: ${Math.floor(process.uptime())}s`
+        );
+      }
+
+      else {
+        // Command tidak dikenal
+        await sendTelegramMessage(chatId, 
+          `Command *${text}* tidak dikenal.\n\n` +
+          `Ketik /start untuk lihat menu lengkap.`
+        );
       }
     }
 
+    // ============ HANDLE CALLBACK QUERY (TOMBOL) ============
     if (callback_query) {
       const data = callback_query.data;
       const chatId = callback_query.message.chat.id;
       const messageId = callback_query.message.message_id;
 
+      // ACC/REJECT
       if (data.startsWith('acc_') || data.startsWith('reject_')) {
         const [action, requestId] = data.split('_');
         const [rows] = await pool.query('SELECT * FROM pending_sales WHERE id = ?', [requestId]);
@@ -1068,7 +1466,7 @@ app.post('/api/telegram/webhook', async (req, res) => {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 chat_id: chatId, message_id: messageId,
-                text: `⚠️ *PENGAJUAN INI SUDAH PERNAH DIPROSES SEBELUMNYA!*`,
+                text: `Pengajuan ini sudah pernah diproses!`,
                 parse_mode: 'Markdown'
               })
             });
@@ -1099,7 +1497,7 @@ app.post('/api/telegram/webhook', async (req, res) => {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 chat_id: chatId, message_id: messageId,
-                text: `✅ *AKUN BERHASIL DI-ACC & AKTIF!*\n\n• Username: \`${reqData.buyer_username}\`\n• Password: \`${reqData.buyer_password}\`\n• Paket: ${reqData.package_name}\n• Diproses oleh: Developer Ranzz (via Telegram)`,
+                text: `*AKUN BERHASIL DI-ACC & AKTIF!*\n\nUsername: \`${reqData.buyer_username}\`\nPassword: \`${reqData.buyer_password}\`\nPaket: ${reqData.package_name}`,
                 parse_mode: 'Markdown'
               })
             });
@@ -1111,67 +1509,143 @@ app.post('/api/telegram/webhook', async (req, res) => {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 chat_id: chatId, message_id: messageId,
-                text: `❌ *PENGAJUAN DITOLAK!*\n\n• Username: \`${reqData.buyer_username}\``,
+                text: `*PENGAJUAN DITOLAK!*\n\nUsername: \`${reqData.buyer_username}\``,
                 parse_mode: 'Markdown'
               })
             });
           }
         }
-      } else if (data === 'cmd_pending') {
+      }
+
+      // BUTTON COMMANDS
+      else if (data === 'cmd_pending') {
         const [rows] = await pool.query('SELECT * FROM pending_sales WHERE status = "pending_approval" ORDER BY id DESC');
         if (rows.length === 0) {
-          await sendTelegramMessage(chatId, "✅ Tidak ada antrean pengajuan akun baru saat ini.");
+          await sendTelegramMessage(chatId, "Tidak ada antrean pengajuan.");
         } else {
           for (const pendingData of rows) await sendTelegramNotification(pendingData);
         }
-      } else if (data === 'cmd_stats') {
+      }
+
+      else if (data === 'cmd_stats') {
         const [usersCount] = await pool.query('SELECT COUNT(*) as total FROM users');
         const [pendingCount] = await pool.query('SELECT COUNT(*) as total FROM pending_sales WHERE status = "pending_approval"');
         const [approvedCount] = await pool.query('SELECT COUNT(*) as total FROM pending_sales WHERE status = "approved"');
-        const [totalLogs] = await pool.query('SELECT COUNT(*) as total FROM pending_sales');
         const [waCount] = await pool.query('SELECT COUNT(*) as total FROM wa_pairings WHERE status = "active"');
-        const [pakasirCount] = await pool.query('SELECT COUNT(*) as total FROM pakasir_transactions WHERE status = "completed"');
+        const [chatCount] = await pool.query('SELECT COUNT(*) as total FROM global_chats');
+        const [revenue] = await pool.query('SELECT SUM(total_payment) as total FROM pakasir_transactions WHERE status = "completed"');
 
-        const statsMsg = 
-          `📊 *STATISTIK SISTEM CIVUTAX*\n\n` +
-          `• Total Akun Terdaftar: *${usersCount[0].total}*\n` +
-          `• Total Akun Di-ACC: *${approvedCount[0].total}*\n` +
-          `• Antrean Menunggu ACC: *${pendingCount[0].total}*\n` +
-          `• Total Log Tersimpan: *${totalLogs[0].total}*\n` +
-          `• WA Pairing Aktif: *${waCount[0].total}*\n` +
-          `• Transaksi Pakasir Sukses: *${pakasirCount[0].total}*`;
+        await sendTelegramMessage(chatId, 
+          `*STATISTIK*\n\n` +
+          `• Users: *${usersCount[0].total}*\n` +
+          `• Pending ACC: *${pendingCount[0].total}*\n` +
+          `• Approved: *${approvedCount[0].total}*\n` +
+          `• WA Aktif: *${waCount[0].total}*\n` +
+          `• Pesan Chat: *${chatCount[0].total}*\n` +
+          `• Revenue: *Rp${Number(revenue[0].total || 0).toLocaleString('id-ID')}*`
+        );
+      }
 
-        await sendTelegramMessage(chatId, statsMsg);
-      } else if (data === 'cmd_wa_list') {
+      else if (data === 'cmd_users') {
+        const [rows] = await pool.query('SELECT username, role FROM users ORDER BY id DESC LIMIT 30');
+        let listText = `*LIST USER (30)*\n\n`;
+        rows.forEach((u, i) => {
+          listText += `${i + 1}. *${u.username}* — ${u.role}\n`;
+        });
+        await sendTelegramMessage(chatId, listText || 'Belum ada user.');
+      }
+
+      else if (data === 'cmd_chats') {
+        const [rows] = await pool.query('SELECT username, role, message FROM global_chats ORDER BY id DESC LIMIT 20');
+        if (rows.length === 0) {
+          await sendTelegramMessage(chatId, "Belum ada chat.");
+        } else {
+          let listText = `*20 CHAT TERBARU*\n\n`;
+          rows.reverse().forEach((c) => {
+            listText += `[${c.role || 'User'}] *${c.username}*: ${c.message}\n`;
+          });
+          await sendTelegramMessage(chatId, listText);
+        }
+      }
+
+      else if (data === 'cmd_wa_list') {
         const [rows] = await pool.query('SELECT * FROM wa_pairings WHERE status = "active" ORDER BY paired_at DESC LIMIT 20');
         if (rows.length === 0) {
-          await sendTelegramMessage(chatId, "📭 Belum ada user yang pairing WA via Termux.");
+          await sendTelegramMessage(chatId, "Belum ada WA pairing aktif.");
         } else {
-          let listText = `📲 *DAFTAR WA PAIRING AKTIF* (${rows.length})\n\n`;
+          let listText = `*WA PAIRING AKTIF*\n\n`;
           rows.forEach((w, i) => {
-            listText += `${i + 1}. *${w.username}*\n   • Nomor: \`${w.phone_number}\`\n   • Pairing: ${new Date(w.paired_at).toLocaleString('id-ID')}\n\n`;
+            listText += `${i + 1}. *${w.username}* — \`${w.phone_number}\`\n`;
           });
           await sendTelegramMessage(chatId, listText);
         }
-      } else if (data === 'cmd_pakasir') {
+      }
+
+      else if (data === 'cmd_pakasir') {
         const [rows] = await pool.query('SELECT * FROM pakasir_transactions ORDER BY id DESC LIMIT 10');
         if (rows.length === 0) {
-          await sendTelegramMessage(chatId, "💳 Belum ada transaksi Pakasir.");
+          await sendTelegramMessage(chatId, "Belum ada transaksi Pakasir.");
         } else {
-          let listText = `💳 *10 TRANSAKSI PAKASIR TERBARU*\n\n`;
+          let listText = `*10 TRANSAKSI PAKASIR*\n\n`;
           rows.forEach((t, i) => {
-            const emoji = t.status === 'completed' ? '✅' : (t.status === 'pending' ? '⏳' : '❌');
-            listText += `${i + 1}. ${emoji} *${t.buyer_username}*\n   • ${t.package_name} • Rp${Number(t.amount).toLocaleString('id-ID')}\n   • ${t.payment_method} • \`${t.txn_id}\`\n\n`;
+            const statusIcon = t.status === 'completed' ? 'OK' : (t.status === 'pending' ? 'WAIT' : 'X');
+            listText += `${i + 1}. [${statusIcon}] *${t.buyer_username}* — ${t.package_name} — Rp${Number(t.amount).toLocaleString('id-ID')}\n`;
           });
           await sendTelegramMessage(chatId, listText);
         }
-      } else if (data === 'cmd_clear_chat') {
-        await pool.query('DELETE FROM global_chats');
-        await sendTelegramMessage(chatId, "🗑️ *Seluruh riwayat Chat Global berhasil dibersihkan!*");
-      } else if (data === 'cmd_clear_logs') {
-        const [result] = await pool.query('DELETE FROM pending_sales');
-        await sendTelegramMessage(chatId, `💥 *SEMUA LOG PENGAJUAN ACC BERHASIL DIHAPUS!*\n\nTotal log yang dihapus: *${result.affectedRows}* entri.`);
       }
+
+      else if (data === 'cmd_revenue') {
+        const [total] = await pool.query('SELECT SUM(total_payment) as total, COUNT(*) as count FROM pakasir_transactions WHERE status = "completed"');
+        const [today] = await pool.query('SELECT SUM(total_payment) as total FROM pakasir_transactions WHERE status = "completed" AND DATE(completed_at) = CURDATE()');
+
+        await sendTelegramMessage(chatId,
+          `*REVENUE*\n\n` +
+          `Total: *Rp${Number(total[0].total || 0).toLocaleString('id-ID')}*\n` +
+          `Dari ${total[0].count} transaksi\n\n` +
+          `Hari ini: *Rp${Number(today[0].total || 0).toLocaleString('id-ID')}*`
+        );
+      }
+
+      else if (data === 'cmd_clear_chat') {
+        const [result] = await pool.query('DELETE FROM global_chats');
+        await sendTelegramMessage(chatId, `Chat dibersihkan. (${result.affectedRows} pesan)`);
+      }
+
+      else if (data === 'cmd_clear_logs') {
+        const [result] = await pool.query('DELETE FROM pending_sales');
+        await sendTelegramMessage(chatId, `Log pengajuan dihapus. (${result.affectedRows} entri)`);
+      }
+
+      else if (data === 'cmd_ping') {
+        const start = Date.now();
+        await pool.query('SELECT 1');
+        const latency = Date.now() - start;
+        await sendTelegramMessage(chatId, `Pong! Latency: *${latency}ms*`);
+      }
+
+      else if (data === 'cmd_help') {
+        await sendTelegramMessage(chatId,
+          `*BANTUAN BOT CIVUTAX*\n\n` +
+          `Semua command diawali slash (/).\n` +
+          `Ketik /start untuk menu utama.\n` +
+          `Klik tombol atau ketik command langsung.\n\n` +
+          `*Fitur Utama:*\n` +
+          `• ACC akun otomatis via tombol\n` +
+          `• Pin chat dari Telegram\n` +
+          `• Add/del user dari bot\n` +
+          `• Cek revenue realtime\n` +
+          `• Kelola WA pairing\n\n` +
+          `Webhook Pakasir sudah aktif dan berfungsi.`
+        );
+      }
+
+      // Acknowledge callback
+      await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ callback_query_id: callback_query.id })
+      }).catch(() => {});
     }
   } catch (err) {
     console.error('Webhook Process Error:', err);
@@ -1181,73 +1655,10 @@ app.post('/api/telegram/webhook', async (req, res) => {
 });
 
 // =========================================================================
-// 📌 CHAT GLOBAL
-// =========================================================================
-async function handleGetChatList(req, res) {
-  try {
-    await ensureTablesExist();
-    const [rows] = await pool.query('SELECT * FROM global_chats ORDER BY id DESC LIMIT 50');
-    const messages = rows.reverse();
-    res.json({
-      success: true,
-      messages: messages,
-      chats: messages,
-      data: messages,
-      list: messages,
-      result: messages
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'DB Error: ' + err.message, messages: [], chats: [], data: [] });
-  }
-}
-
-app.get('/api/chat/list', handleGetChatList);
-app.get('/api/chat/messages', handleGetChatList);
-
-app.post('/api/chat/send', async (req, res) => {
-  const { username, message, reply_to } = req.body;
-  if (!username || !message) return res.status(400).json({ success: false, message: 'Username dan pesan wajib diisi!' });
-
-  try {
-    await ensureTablesExist();
-    const replyData = reply_to ? JSON.stringify(reply_to) : null;
-
-    try {
-      await pool.query('INSERT INTO global_chats (username, message, reply_to) VALUES (?, ?, ?)', [username, message, replyData]);
-    } catch (insertErr) {
-      await pool.query('INSERT INTO global_chats (username, message) VALUES (?, ?)', [username, message]);
-    }
-
-    res.json({ success: true, message: 'Pesan berhasil terkirim!' });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
-  }
-});
-
-async function handleClearChat(req, res) {
-  const username = (req.body && req.body.username) || req.query.username;
-
-  if (!username || username.toLowerCase() !== 'ranzz') {
-    return res.status(403).json({ success: false, message: 'Akses ditolak! Hanya Ranzz yang dapat membersihkan chat.' });
-  }
-
-  try {
-    await ensureTablesExist();
-    await pool.query('DELETE FROM global_chats');
-    res.json({ success: true, message: 'Seluruh riwayat chat berhasil dibersihkan!' });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'DB Error: ' + err.message });
-  }
-}
-
-app.post('/api/chat/clear', handleClearChat);
-app.delete('/api/chat/clear', handleClearChat);
-
-// =========================================================================
 // 📌 FALLBACK 404
 // =========================================================================
 app.use((req, res) => {
-  res.status(404).json({ success: false, message: `Endpoint ${req.method} ${req.originalUrl} tidak ditemukan di server.` });
+  res.status(404).json({ success: false, message: `Endpoint ${req.method} ${req.originalUrl} tidak ditemukan.` });
 });
 
 // =========================================================================
