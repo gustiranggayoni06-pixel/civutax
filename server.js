@@ -1655,6 +1655,93 @@ app.post('/api/telegram/webhook', async (req, res) => {
 });
 
 // =========================================================================
+// 📌 TIKTOK DOWNLOADER (MULTI-FALLBACK)
+// =========================================================================
+app.get('/api/tools/tiktok', async (req, res) => {
+  const { url } = req.query;
+
+  if (!url) return res.status(400).json({ success: false, message: 'Parameter URL wajib diisi!' });
+  if (!url.includes('tiktok.com')) return res.status(400).json({ success: false, message: 'Link harus dari TikTok!' });
+
+  const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+  // ============ SUMBER 1: TIKWM ============
+  try {
+    const r1 = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}&hd=1`, {
+      headers: { 'User-Agent': userAgent, 'Accept': 'application/json' }
+    });
+    const d1 = await r1.json();
+
+    if (d1.code === 0 && d1.data) {
+      const v = d1.data;
+      const base = 'https://www.tikwm.com';
+      const fix = (u) => u ? (u.startsWith('http') ? u : base + u) : null;
+
+      return res.json({
+        success: true,
+        source: 'tikwm',
+        data: {
+          title: v.title || 'TikTok Video',
+          author: v.author ? v.author.unique_id : 'unknown',
+          cover: fix(v.cover),
+          video: fix(v.hdplay) || fix(v.play),
+          audio: fix(v.music),
+          duration: v.duration || 0,
+          play_count: v.play_count || 0,
+          likes: v.digg_count || 0,
+          comments: v.comment_count || 0,
+          shares: v.share_count || 0
+        }
+      });
+    }
+  } catch (e) {
+    console.warn('[TIKTOK] TikWM gagal:', e.message);
+  }
+
+  // ============ SUMBER 2: DOUYIN.WTF ============
+  try {
+    const r2 = await fetch(`https://api.douyin.wtf/api/hybrid/video_data?url=${encodeURIComponent(url)}&minimal=false`, {
+      headers: { 'User-Agent': userAgent, 'Accept': 'application/json' }
+    });
+    const d2 = await r2.json();
+
+    if (d2.code === 200 && d2.data) {
+      const v = d2.data;
+      const videoUrl = v.video_data?.nwm_video_url_HQ 
+                    || v.video_data?.nwm_video_url 
+                    || v.video_data?.wm_video_url_HQ
+                    || v.video_data?.wm_video_url;
+
+      if (videoUrl) {
+        return res.json({
+          success: true,
+          source: 'douyin.wtf',
+          data: {
+            title: v.desc || 'TikTok Video',
+            author: v.author?.unique_id || 'unknown',
+            cover: v.video_data?.cover_data?.cover?.url_list?.[0] || null,
+            video: videoUrl,
+            audio: v.music_data?.play_url?.url_list?.[0] || null,
+            duration: v.video_data?.duration || 0,
+            play_count: v.statistics?.play_count || 0,
+            likes: v.statistics?.digg_count || 0,
+            comments: v.statistics?.comment_count || 0,
+            shares: v.statistics?.share_count || 0
+          }
+        });
+      }
+    }
+  } catch (e) {
+    console.warn('[TIKTOK] Douyin.wtf gagal:', e.message);
+  }
+
+  return res.status(404).json({
+    success: false,
+    message: 'Semua sumber gagal. Coba link lain atau beberapa saat lagi.'
+  });
+});
+
+// =========================================================================
 // 📌 FALLBACK 404
 // =========================================================================
 app.use((req, res) => {
