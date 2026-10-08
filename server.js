@@ -1742,6 +1742,140 @@ app.get('/api/tools/tiktok', async (req, res) => {
 });
 
 // =========================================================================
+// 📌 UPLOAD IMAGE TO URL (MULTI-FALLBACK: Catbox → ImgBB → Uguu)
+// =========================================================================
+
+// Middleware buat terima file upload (tanpa perlu install multer)
+// Pakai raw body + boundary parsing sederhana
+app.use('/api/tools/upload', express.raw({ 
+  type: ['image/*', 'application/octet-stream'], 
+  limit: '10mb' 
+}));
+
+app.post('/api/tools/upload', async (req, res) => {
+  try {
+    // Terima file dari FormData di frontend
+    // req.body bakal jadi Buffer kalau content-type image/*
+    // Tapi karena frontend kirim FormData, kita handle multipart manual
+    // Fallback: pakai endpoint yang terima base64 JSON
+    
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Gunakan endpoint /api/tools/upload-base64' 
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Endpoint utama: terima base64 image dari frontend
+app.post('/api/tools/upload-base64', async (req, res) => {
+  const { image, filename } = req.body;
+
+  if (!image) {
+    return res.status(400).json({ success: false, message: 'Data image wajib dikirim!' });
+  }
+
+  // Bersihin prefix data:image/xxx;base64,
+  const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
+  const buffer = Buffer.from(base64Data, 'base64');
+
+  if (buffer.length > 10 * 1024 * 1024) {
+    return res.status(400).json({ success: false, message: 'Ukuran gambar max 10MB!' });
+  }
+
+  const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+  // ============ SUMBER 1: CATBOX.MOE ============
+  try {
+    const formData = new FormData();
+    formData.append('reqtype', 'fileupload');
+    formData.append('fileToUpload', new Blob([buffer], { type: 'image/jpeg' }), filename || 'upload.jpg');
+
+    const r1 = await fetch('https://catbox.moe/user/api.php', {
+      method: 'POST',
+      body: formData,
+      headers: { 'User-Agent': userAgent }
+    });
+
+    const url1 = (await r1.text()).trim();
+
+    if (url1 && url1.startsWith('http')) {
+      return res.json({ success: true, source: 'catbox', url: url1 });
+    }
+  } catch (e) {
+    console.warn('[UPLOAD] Catbox gagal:', e.message);
+  }
+
+  // ============ SUMBER 2: UGUU.SE (GRATIS, NO KEY) ============
+  try {
+    const formData2 = new FormData();
+    formData2.append('files[]', new Blob([buffer], { type: 'image/jpeg' }), filename || 'upload.jpg');
+
+    const r2 = await fetch('https://uguu.se/upload.php', {
+      method: 'POST',
+      body: formData2,
+      headers: { 'User-Agent': userAgent }
+    });
+
+    const d2 = await r2.json();
+
+    if (d2 && d2.success && d2.files && d2.files[0] && d2.files[0].url) {
+      return res.json({ success: true, source: 'uguu', url: d2.files[0].url });
+    }
+  } catch (e) {
+    console.warn('[UPLOAD] Uguu gagal:', e.message);
+  }
+
+  // ============ SUMBER 3: TMPFILES.ORG (GRATIS, NO KEY) ============
+  try {
+    const formData3 = new FormData();
+    formData3.append('file', new Blob([buffer], { type: 'image/jpeg' }), filename || 'upload.jpg');
+
+    const r3 = await fetch('https://tmpfiles.org/api/v1/upload', {
+      method: 'POST',
+      body: formData3,
+      headers: { 'User-Agent': userAgent }
+    });
+
+    const d3 = await r3.json();
+
+    if (d3 && d3.status === 'success' && d3.data && d3.data.url) {
+      // Tmpfiles kasih URL halaman, convert ke direct link
+      const directUrl = d3.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
+      return res.json({ success: true, source: 'tmpfiles', url: directUrl });
+    }
+  } catch (e) {
+    console.warn('[UPLOAD] Tmpfiles gagal:', e.message);
+  }
+
+  // ============ SUMBER 4: 0X0.ST (GRATIS, NO KEY) ============
+  try {
+    const formData4 = new FormData();
+    formData4.append('file', new Blob([buffer], { type: 'image/jpeg' }), filename || 'upload.jpg');
+
+    const r4 = await fetch('https://0x0.st', {
+      method: 'POST',
+      body: formData4,
+      headers: { 'User-Agent': userAgent }
+    });
+
+    const url4 = (await r4.text()).trim();
+
+    if (url4 && url4.startsWith('http')) {
+      return res.json({ success: true, source: '0x0.st', url: url4 });
+    }
+  } catch (e) {
+    console.warn('[UPLOAD] 0x0.st gagal:', e.message);
+  }
+
+  return res.status(500).json({
+    success: false,
+    message: 'Semua server upload gagal. Coba lagi beberapa saat.'
+  });
+});
+
+// =========================================================================
 // 📌 FALLBACK 404
 // =========================================================================
 app.use((req, res) => {
