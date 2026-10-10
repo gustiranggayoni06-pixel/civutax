@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Login - CIVUTAX</title>
+  <style>
+    :root {
+      --bg-body: #070b13;
+      --bg-card: #101828;
+      --bg-card-2: #0d1421;
+      --bg-input: #0a1020;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-color: #1e293b;
+      --accent: #38bdf8;
+      --accent-2: #0ea5e9;
+      --accent-glow: rgba(56, 189, 248, 0.35);
+      --danger: #ef4444;
+      --success: #22c55e;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      min-height: 100%;
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: var(--bg-body);
+      color: var(--text-main);
+      padding: 1rem;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    body::before,
+    body::after {
+      content: '';
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.35;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body::before {
+      width: 420px;
+      height: 420px;
+      background: radial-gradient(circle, #0ea5e9, transparent 70%);
+      top: -140px;
+      left: -140px;
+      animation: floatGlow 12s ease-in-out infinite;
+    }
+
+    body::after {
+      width: 380px;
+      height: 380px;
+      background: radial-gradient(circle, #a855f7, transparent 70%);
+      bottom: -120px;
+      right: -120px;
+      animation: floatGlow 14s ease-in-out infinite reverse;
+    }
+
+    @keyframes floatGlow {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(30px, -20px) scale(1.08); }
+    }
+
+    .auth-card {
+      position: relative;
+      z-index: 1;
+      background: linear-gradient(160deg, var(--bg-card) 0%, var(--bg-card-2) 100%);
+      padding: 2.25rem 1.75rem 2rem 1.75rem;
+      border-radius: 22px;
+      box-shadow:
+        0 20px 50px rgba(0, 0, 0, 0.6),
+        0 0 0 1px rgba(56, 189, 248, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      width: 100%;
+      max-width: 400px;
+      border: 1px solid var(--border-color);
+      text-align: center;
+      animation: cardEnter 0.5s cubic-bezier(0.2, 0.9, 0.3, 1);
+    }
+
+    @keyframes cardEnter {
+      from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.97);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    /* ===== VIDEO 16:9 WRAPPER ===== */
+    .logo-wrap {
+      position: relative;
+      display: block;
+      width: 100%;
+      max-width: 260px;
+      aspect-ratio: 16 / 9;
+      margin: 0 auto 1.25rem auto;
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    .logo-wrap::before {
+      content: '';
+      position: absolute;
+      inset: -6px;
+      border-radius: 20px;
+      background: conic-gradient(from 0deg, var(--accent), #a855f7, var(--accent));
+      animation: spinGlow 6s linear infinite;
+      filter: blur(8px);
+      opacity: 0.55;
+      z-index: -1;
+    }
+
+    @keyframes spinGlow {
+      to { transform: rotate(360deg); }
+    }
+
+    .login-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      border-radius: 16px;
+      border: 2px solid var(--bg-card);
+      box-shadow: 0 0 22px var(--accent-glow);
+      background: #000;
+      pointer-events: none;
+    }
+
+    /* Tombol Unmute */
+    .unmute-btn {
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(0, 0, 0, 0.65);
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 5;
+      transition: background 0.2s, transform 0.15s;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      pointer-events: auto;
+    }
+
+    .unmute-btn:hover,
+    .unmute-btn:active {
+      background: var(--accent);
+      transform: scale(1.08);
+    }
+
+    .unmute-btn svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+    }
+
+    .auth-title {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--text-main);
+      margin-bottom: 0.25rem;
+      letter-spacing: 0.5px;
+    }
+
+    .auth-title span {
+      color: var(--accent);
+      text-shadow: 0 0 18px var(--accent-glow);
+    }
+
+    .auth-subtitle {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 1.75rem;
+      font-weight: 500;
+    }
+
+    .form-group {
+      margin-bottom: 1.15rem;
+      text-align: left;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .input-icon {
+      position: absolute;
+      left: 0.85rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      transition: color 0.2s;
+    }
+
+    .input-icon svg {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 0.85rem 2.75rem 0.85rem 2.75rem;
+      border-radius: 12px;
+      border: 1.5px solid var(--border-color);
+      background: var(--bg-input);
+      color: var(--text-main);
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+      font-weight: 500;
+    }
+
+    .form-group input::placeholder {
+      color: #475569;
+      font-weight: 500;
+    }
+
+    .form-group input:focus {
+      border-color: var(--accent);
+      background: #0b1424;
+      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.12);
+    }
+
+    .input-wrapper:focus-within .input-icon {
+      color: var(--accent);
+    }
+
+    .toggle-password {
+      position: absolute;
+      right: 0.6rem;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.4rem;
+      border-radius: 8px;
+      transition: color 0.2s, background 0.2s;
+      z-index: 2;
+    }
+
+    .toggle-password svg {
+      width: 20px;
+      height: 20px;
+      stroke: currentColor;
+    }
+
+    .toggle-password:hover,
+    .toggle-password:active {
+      color: var(--accent);
+      background: rgba(56, 189, 248, 0.1);
+    }
+
+    .btn-submit {
+      width: 100%;
+      padding: 0.9rem 1rem;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+      color: #04121e;
+      font-size: 1rem;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.2s, opacity 0.2s;
+      margin-top: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.55rem;
+      letter-spacing: 0.3px;
+      box-shadow: 0 8px 22px rgba(56, 189, 248, 0.28);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-submit::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.35) 50%, transparent 70%);
+      transform: translateX(-100%);
+      transition: transform 0.6s;
+    }
+
+    .btn-submit:hover::before {
+      transform: translateX(100%);
+    }
+
+    .btn-submit:hover {
+      box-shadow: 0 10px 28px rgba(56, 189, 248, 0.42);
+    }
+
+    .btn-submit:active {
+      transform: scale(0.98);
+    }
+
+    .btn-submit:disabled {
+      background: linear-gradient(135deg, #334155, #1e293b);
+      color: #64748b;
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .btn-submit:disabled::before {
+      display: none;
+    }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2.5px solid rgba(255, 255, 255, 0.35);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+
+    .btn-submit.loading .spinner {
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .message {
+      margin-top: 1.1rem;
+      font-size: 0.85rem;
+      min-height: 1.2rem;
+      font-weight: 600;
+      padding: 0.7rem 0.9rem;
+      border-radius: 10px;
+      display: none;
+      animation: msgEnter 0.3s ease;
+      line-height: 1.4;
+    }
+
+    @keyframes msgEnter {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message.show { display: block; }
+
+    .message.error {
+      color: #fca5a5;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+    }
+
+    .message.success {
+      color: #86efac;
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.35);
+    }
+
+    .message.info {
+      color: #7dd3fc;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+    }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin: 1.5rem 0 1rem 0;
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .divider::before,
+    .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(to right, transparent, var(--border-color), transparent);
+    }
+
+    .support-link {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .support-link a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 700;
+      transition: color 0.2s;
+    }
+
+    .support-link a:hover {
+      color: #7dd3fc;
+      text-decoration: underline;
+    }
+
+    .toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translate(-50%, -150%);
+      background: var(--bg-card);
+      color: var(--text-main);
+      padding: 0.85rem 1.25rem;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      font-size: 0.88rem;
+      font-weight: 600;
+      z-index: 9999;
+      transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1);
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      max-width: 90vw;
+    }
+
+    .toast.show {
+      transform: translate(-50%, 0);
+    }
+
+    .toast.success { border-color: var(--success); color: #86efac; }
+    .toast.error { border-color: var(--danger); color: #fca5a5; }
+    .toast.info { border-color: var(--accent); color: #7dd3fc; }
+
+    @media (max-width: 420px) {
+      .auth-card {
+        padding: 2rem 1.35rem 1.75rem 1.35rem;
+      }
+      .logo-wrap { max-width: 220px; }
+      .auth-title { font-size: 1.45rem; }
+    }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <div class="auth-card">
+    <!-- VIDEO 16:9 -->
+    <div class="logo-wrap">
+      <video 
+        id="loginVideo"
+        class="login-video"
+        src="https://videotourl.com/videos/1791642296827-9d3d3eac-0ae8-482d-bba3-feb50ed13cfd.mp4"
+        autoplay 
+        loop 
+        muted 
+        playsinline
+        preload="auto"
+      ></video>
+
+      <button class="unmute-btn" id="unmuteBtn" onclick="toggleMute(event)" aria-label="Aktifkan Suara">
+        <svg id="iconMute" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5z"/>
+          <line x1="23" y1="9" x2="17" y2="15"/>
+          <line x1="17" y1="9" x2="23" y2="15"/>
+        </svg>
+        <svg id="iconSound" viewBox="0 0 24 24" style="display:none;">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15.54 8.46a5 5 0 010 7.07"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19.07 4.93a10 10 0 010 14.14"/>
+        </svg>
+      </button>
+    </div>
+    
+    <h1 class="auth-title">CIVU<span>TAX</span></h1>
+    <p class="auth-subtitle">Masuk ke akun Anda untuk melanjutkan</p>
+
+    <form id="loginForm" autocomplete="on">
+      <div class="form-group">
+        <label for="loginUsername">Username / Email</label>
+        <div class="input-wrapper">
+          <div class="input-icon">
+            <svg fill="none" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+            </svg>
+          </div>
+          <input type="text" id="loginUsername" placeholder="Masukkan username" required autocomplete="username">
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label for="loginPassword">Password</label>
+        <div class="input-wrapper">
+          <div class="input-icon">
+            <svg fill="none" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+            </svg>
+          </div>
+          <input type="password" id="loginPassword" placeholder="Masukkan password" required autocomplete="current-password">
+          <button type="button" class="toggle-password" onclick="togglePasswordVisibility('loginPassword', this)" aria-label="Lihat Password">
+            <svg id="eyeOpen" fill="none" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+            </svg>
+            <svg id="eyeClosed" fill="none" viewBox="0 0 24 24" stroke-width="2" style="display:none;">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858-5.908a10.018 10.018 0 014.122-.963c4.478 0 8.268 2.943 9.542 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21M3 3l18 18"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <button type="submit" id="btnLoginSubmit" class="btn-submit">
+        <span class="spinner"></span>
+        <span id="btnLoginText">Login</span>
+      </button>
+    </form>
+
+    <div id="message" class="message"></div>
+
+    <div class="divider">Butuh Bantuan?</div>
+
+    <div class="support-link">
+      Belum punya akun? <a href="https://t.me/ranzz_offc" target="_blank" rel="noopener noreferrer">Hubungi Developer</a>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const API_BASE_URL = 'https://civutax-s9zn.vercel.app';
+    let isSubmitting = false;
+
+    /* ============================================
+       AUTO UNMUTE - SUARA LANGSUNG ON
+       Begitu user gerak/sentuh/scroll layar
+       ============================================ */
+    (function autoUnmute() {
+      const video = document.getElementById('loginVideo');
+      const iconMute = document.getElementById('iconMute');
+      const iconSound = document.getElementById('iconSound');
+      if (!video) return;
+
+      let unmuted = false;
+      let listenersAttached = false;
+
+      const events = [
+        'click', 'touchstart', 'touchend', 'pointerdown', 'pointerup',
+        'scroll', 'wheel', 'keydown', 'keypress',
+        'mousemove', 'mouseover', 'focus', 'input', 'visibilitychange'
+      ];
+
+      function activateSound() {
+        if (unmuted) return;
+        unmuted = true;
+
+        video.muted = false;
+        video.volume = 1.0;
+
+        const p = video.play();
+        if (p !== undefined) {
+          p.catch(() => {
+            video.muted = true;
+            unmuted = false;
+          });
+        }
+
+        if (iconMute) iconMute.style.display = 'none';
+        if (iconSound) iconSound.style.display = 'block';
+
+        events.forEach(evt => {
+          document.removeEventListener(evt, activateSound, true);
+          window.removeEventListener(evt, activateSound, true);
+        });
+        listenersAttached = false;
+      }
+
+      function attachListeners() {
+        if (listenersAttached) return;
+        listenersAttached = true;
+        events.forEach(evt => {
+          document.addEventListener(evt, activateSound, { once: true, capture: true, passive: true });
+          window.addEventListener(evt, activateSound, { once: true, capture: true, passive: true });
+        });
+      }
+
+      video.addEventListener('loadedmetadata', attachListeners, { once: true });
+      attachListeners();
+
+      // Coba autoplay + suara langsung (khusus WebView APK)
+      const tryPlay = video.play();
+      if (tryPlay !== undefined) {
+        tryPlay.then(() => {
+          video.muted = false;
+          video.volume = 1.0;
+          unmuted = true;
+          if (iconMute) iconMute.style.display = 'none';
+          if (iconSound) iconSound.style.display = 'block';
+          events.forEach(evt => {
+            document.removeEventListener(evt, activateSound, true);
+            window.removeEventListener(evt, activateSound, true);
+          });
+        }).catch(() => {});
+      }
+    })();
+
+    /* ============================================
+       TOGGLE MUTE MANUAL (TOMbol POJOK)
+       ============================================ */
+    function toggleMute(event) {
+      event.stopPropagation();
+      event.preventDefault();
+      
+      const video = document.getElementById('loginVideo');
+      const iconMute = document.getElementById('iconMute');
+      const iconSound = document.getElementById('iconSound');
+
+      video.muted = !video.muted;
+
+      if (video.muted) {
+        iconMute.style.display = 'block';
+        iconSound.style.display = 'none';
+      } else {
+        iconMute.style.display = 'none';
+        iconSound.style.display = 'block';
+        if (video.paused) {
+          video.play().catch(() => {});
+        }
+      }
+    }
+
+    // Cek Sesi Otomatis
+    document.addEventListener('DOMContentLoaded', () => {
+      const savedUser = localStorage.getItem('user_session');
+      if (savedUser) {
+        try {
+          const parsed = JSON.parse(savedUser);
+          if (parsed && parsed.username) {
+            showToast('Sesi ditemukan, mengalihkan...', 'info');
+            setTimeout(() => {
+              window.location.replace('dashboard.html');
+            }, 600);
+          }
+        } catch (e) {
+          localStorage.removeItem('user_session');
+        }
+      }
+    });
+
+    function togglePasswordVisibility(inputId, btn) {
+      const input = document.getElementById(inputId);
+      const eyeOpen = btn.querySelector('#eyeOpen');
+      const eyeClosed = btn.querySelector('#eyeClosed');
+
+      if (input.type === 'password') {
+        input.type = 'text';
+        if (eyeOpen) eyeOpen.style.display = 'none';
+        if (eyeClosed) eyeClosed.style.display = 'block';
+      } else {
+        input.type = 'password';
+        if (eyeOpen) eyeOpen.style.display = 'block';
+        if (eyeClosed) eyeClosed.style.display = 'none';
+      }
+    }
+
+    function showMessage(text, type = 'error') {
+      const messageDiv = document.getElementById('message');
+      messageDiv.className = 'message show ' + type;
+      messageDiv.textContent = text;
+    }
+
+    function hideMessage() {
+      const messageDiv = document.getElementById('message');
+      messageDiv.className = 'message';
+      messageDiv.textContent = '';
+    }
+
+    let toastTimer = null;
+    function showToast(text, type = 'info', duration = 2400) {
+      const toast = document.getElementById('toast');
+      if (!toast) return;
+
+      toast.className = 'toast show ' + type;
+      toast.textContent = text;
+
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('show');
+      }, duration);
+    }
+
+    function setLoading(isLoading) {
+      const btn = document.getElementById('btnLoginSubmit');
+      const btnText = document.getElementById('btnLoginText');
+      btn.disabled = isLoading;
+
+      if (isLoading) {
+        btn.classList.add('loading');
+        btnText.textContent = 'Memproses...';
+      } else {
+        btn.classList.remove('loading');
+        btnText.textContent = 'Login';
+      }
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async function(event) {
+      event.preventDefault();
+      if (isSubmitting) return;
+
+      const username = document.getElementById('loginUsername').value.trim();
+      const password = document.getElementById('loginPassword').value.trim();
+
+      hideMessage();
+
+      if (!username || !password) {
+        showMessage('⚠️ Username dan Password wajib diisi!', 'error');
+        showToast('Isi semua kolom dulu!', 'error');
+        return;
+      }
+
+      if (username.length < 3) {
+        showMessage('⚠️ Username minimal 3 karakter!', 'error');
+        showToast('Username terlalu pendek!', 'error');
+        return;
+      }
+
+      isSubmitting = true;
+      setLoading(true);
+      showMessage('🔄 Proses autentikasi...', 'info');
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          showMessage('✓ Login berhasil! Mengalihkan...', 'success');
+          showToast('Login berhasil! Selamat datang 🎉', 'success');
+
+          localStorage.setItem('user_session', JSON.stringify(result.user));
+
+          setTimeout(() => {
+            window.location.replace('dashboard.html');
+          }, 800);
+        } else {
+          showMessage('❌ ' + (result.message || 'Username / Password salah!'), 'error');
+          showToast(result.message || 'Login gagal!', 'error');
+          setLoading(false);
+          isSubmitting = false;
+        }
+      } catch (error) {
+        console.error('Login Error:', error);
+        showMessage('❌ Gagal terhubung ke server backend!', 'error');
+        showToast('Koneksi ke server gagal!', 'error');
+        setLoading(false);
+        isSubmitting = false;
+      }
+    });
+
+    document.getElementById('loginUsername').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('loginPassword').focus();
+      }
+    });
+  </script>
+
+</body>
+</html>
