@@ -1,6 +1,7 @@
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
+const path = require('path');
 
 const app = express();
 
@@ -10,7 +11,13 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Api-Key', 'X-Secret']
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
+app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+
+// =========================================================================
+// 📌 STATIC FILES — SERVE INDEX, DASHBOARD, ADMIN-ACC
+// =========================================================================
+app.use(express.static(path.join(__dirname, 'public')));
 
 // =========================================================================
 // 📌 KONFIGURASI TELEGRAM
@@ -201,10 +208,27 @@ async function sendTelegramNotification(pendingData) {
 }
 
 // =========================================================================
-// 📌 ROOT ROUTE
+// 📌 ROOT ROUTE — SERVE INDEX.HTML
 // =========================================================================
 app.get('/', (req, res) => {
-res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// ROUTE KHUSUS UNTUK DASHBOARD & ADMIN-ACC
+app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
+
+app.get('/dashboard.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
+
+app.get('/admin-acc', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin-acc.html'));
+});
+
+app.get('/admin-acc.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin-acc.html'));
 });
 
 // =========================================================================
@@ -286,7 +310,6 @@ app.get('/api/users/all', async (req, res) => {
   }
 });
 
-// Profile endpoint
 app.get('/api/users/profile/:username', async (req, res) => {
   const { username } = req.params;
   if (!username) return res.status(400).json({ success: false, message: 'username wajib!' });
@@ -303,7 +326,6 @@ app.get('/api/users/profile/:username', async (req, res) => {
   }
 });
 
-// Update profile
 app.post('/api/users/update-profile', async (req, res) => {
   const { username, display_name, avatar_url } = req.body;
   if (!username || !display_name) {
@@ -945,14 +967,12 @@ app.post('/api/chat/send', async (req, res) => {
     await ensureTablesExist();
     const replyData = reply_to ? JSON.stringify(reply_to) : null;
 
-    // Simpan dengan role
     try {
       await pool.query(
         'INSERT INTO global_chats (username, role, message, reply_to) VALUES (?, ?, ?, ?)',
         [username, role || 'User', message, replyData]
       );
     } catch (insertErr) {
-      // Fallback kalau kolom role belum ada
       await pool.query('INSERT INTO global_chats (username, message, reply_to) VALUES (?, ?, ?)', [username, message, replyData]);
     }
 
@@ -962,7 +982,6 @@ app.post('/api/chat/send', async (req, res) => {
   }
 });
 
-// PIN CHAT — hanya DEV
 app.post('/api/chat/pin', async (req, res) => {
   const { username, message, pinned_by } = req.body;
   if (!username || !message || !pinned_by) {
@@ -976,11 +995,9 @@ app.post('/api/chat/pin', async (req, res) => {
   try {
     await ensureTablesExist();
 
-    // Ambil role target user
     const [users] = await pool.query('SELECT role FROM users WHERE username = ?', [username]);
     const role = users.length > 0 ? users[0].role : 'User';
 
-    // Hapus pinned lama, ganti dengan yang baru
     await pool.query('DELETE FROM pinned_chats');
     await pool.query(
       'INSERT INTO pinned_chats (username, role, message, pinned_by) VALUES (?, ?, ?, ?)',
@@ -993,7 +1010,6 @@ app.post('/api/chat/pin', async (req, res) => {
   }
 });
 
-// GET pinned chat
 app.get('/api/chat/pinned', async (req, res) => {
   try {
     await ensureTablesExist();
@@ -1004,7 +1020,6 @@ app.get('/api/chat/pinned', async (req, res) => {
   }
 });
 
-// UNPIN chat — hanya DEV
 app.post('/api/chat/unpin', async (req, res) => {
   const { username } = req.body;
   if (!username || username.toLowerCase() !== 'ranzz') {
@@ -1058,7 +1073,6 @@ app.post('/api/telegram/webhook', async (req, res) => {
         return res.sendStatus(200);
       }
 
-      // ============ /start & /menu ============
       if (text === '/start' || text === '/menu') {
         const startMenu = 
           `*BOT KONTROL CIVUTAX*\n` +
@@ -1104,7 +1118,6 @@ app.post('/api/telegram/webhook', async (req, res) => {
         await sendTelegramMessage(chatId, startMenu, keyboard);
       }
 
-      // ============ /ping ============
       else if (text === '/ping') {
         const start = Date.now();
         await pool.query('SELECT 1');
@@ -1112,7 +1125,6 @@ app.post('/api/telegram/webhook', async (req, res) => {
         await sendTelegramMessage(chatId, `Pong!\n\nLatency: *${latency}ms*\nBot aktif 24/7`);
       }
 
-      // ============ /version ============
       else if (text === '/version') {
         await sendTelegramMessage(chatId, 
           `*CIVUTAX BOT VERSION*\n\n` +
@@ -1124,7 +1136,6 @@ app.post('/api/telegram/webhook', async (req, res) => {
         );
       }
 
-      // ============ /help ============
       else if (text === '/help') {
         await sendTelegramMessage(chatId,
           `*PANDUAN BOT CIVUTAX*\n\n` +
@@ -1142,7 +1153,6 @@ app.post('/api/telegram/webhook', async (req, res) => {
         );
       }
 
-      // ============ /pending ============
       else if (text === '/pending') {
         const [rows] = await pool.query('SELECT * FROM pending_sales WHERE status = "pending_approval" ORDER BY id DESC');
         if (rows.length === 0) {
@@ -1152,7 +1162,6 @@ app.post('/api/telegram/webhook', async (req, res) => {
         }
       }
 
-      // ============ /stats ============
       else if (text === '/stats') {
         const [usersCount] = await pool.query('SELECT COUNT(*) as total FROM users');
         const [pendingCount] = await pool.query('SELECT COUNT(*) as total FROM pending_sales WHERE status = "pending_approval"');
@@ -1182,7 +1191,6 @@ app.post('/api/telegram/webhook', async (req, res) => {
         await sendTelegramMessage(chatId, statsMsg);
       }
 
-      // ============ /users ============
       else if (text === '/users') {
         const [rows] = await pool.query('SELECT username, role, created_at FROM users ORDER BY id DESC LIMIT 30');
         if (rows.length === 0) {
@@ -1197,7 +1205,6 @@ app.post('/api/telegram/webhook', async (req, res) => {
         }
       }
 
-      // ============ /adduser ============
       else if (text.startsWith('/adduser')) {
         const parts = text.split(' ');
         if (parts.length < 3) {
@@ -1232,7 +1239,6 @@ app.post('/api/telegram/webhook', async (req, res) => {
         }
       }
 
-      // ============ /deluser ============
       else if (text.startsWith('/deluser')) {
         const parts = text.split(' ');
         if (parts.length < 2) {
@@ -1253,7 +1259,6 @@ app.post('/api/telegram/webhook', async (req, res) => {
         }
       }
 
-      // ============ /setrole ============
       else if (text.startsWith('/setrole')) {
         const parts = text.split(' ');
         if (parts.length < 3) {
@@ -1284,7 +1289,6 @@ app.post('/api/telegram/webhook', async (req, res) => {
         }
       }
 
-      // ============ /chats ============
       else if (text === '/chats') {
         const [rows] = await pool.query('SELECT username, role, message, created_at FROM global_chats ORDER BY id DESC LIMIT 20');
         if (rows.length === 0) {
@@ -1298,7 +1302,6 @@ app.post('/api/telegram/webhook', async (req, res) => {
         }
       }
 
-      // ============ /pin ============
       else if (text.startsWith('/pin')) {
         const parts = text.split(' ');
         if (parts.length < 3) {
@@ -1332,19 +1335,16 @@ app.post('/api/telegram/webhook', async (req, res) => {
         }
       }
 
-      // ============ /unpin ============
       else if (text === '/unpin') {
         await pool.query('DELETE FROM pinned_chats');
         await sendTelegramMessage(chatId, "Pesan sematan dihapus.");
       }
 
-      // ============ /clearchat ============
       else if (text === '/clearchat') {
         const [result] = await pool.query('DELETE FROM global_chats');
         await sendTelegramMessage(chatId, `Chat global dibersihkan. (${result.affectedRows} pesan dihapus)`);
       }
 
-      // ============ /wapairing ============
       else if (text === '/wapairing') {
         const [rows] = await pool.query('SELECT * FROM wa_pairings WHERE status = "active" ORDER BY paired_at DESC LIMIT 20');
         if (rows.length === 0) {
@@ -1358,7 +1358,6 @@ app.post('/api/telegram/webhook', async (req, res) => {
         }
       }
 
-      // ============ /unpair ============
       else if (text.startsWith('/unpair')) {
         const parts = text.split(' ');
         if (parts.length < 2) {
@@ -1374,7 +1373,6 @@ app.post('/api/telegram/webhook', async (req, res) => {
         }
       }
 
-      // ============ /pakasir ============
       else if (text === '/pakasir') {
         const [rows] = await pool.query('SELECT * FROM pakasir_transactions ORDER BY id DESC LIMIT 10');
         if (rows.length === 0) {
@@ -1389,7 +1387,6 @@ app.post('/api/telegram/webhook', async (req, res) => {
         }
       }
 
-      // ============ /revenue ============
       else if (text === '/revenue') {
         const [total] = await pool.query('SELECT SUM(total_payment) as total, COUNT(*) as count FROM pakasir_transactions WHERE status = "completed"');
         const [today] = await pool.query('SELECT SUM(total_payment) as total, COUNT(*) as count FROM pakasir_transactions WHERE status = "completed" AND DATE(completed_at) = CURDATE()');
@@ -1410,13 +1407,11 @@ app.post('/api/telegram/webhook', async (req, res) => {
         );
       }
 
-      // ============ /clearlogs ============
       else if (text === '/clearlogs') {
         const [result] = await pool.query('DELETE FROM pending_sales');
         await sendTelegramMessage(chatId, `Semua log pengajuan dihapus. (${result.affectedRows} entri)`);
       }
 
-      // ============ /backup ============
       else if (text === '/backup') {
         const [users] = await pool.query('SELECT COUNT(*) as c FROM users');
         const [chats] = await pool.query('SELECT COUNT(*) as c FROM global_chats');
@@ -1438,7 +1433,6 @@ app.post('/api/telegram/webhook', async (req, res) => {
       }
 
       else {
-        // Command tidak dikenal
         await sendTelegramMessage(chatId, 
           `Command *${text}* tidak dikenal.\n\n` +
           `Ketik /start untuk lihat menu lengkap.`
@@ -1452,7 +1446,6 @@ app.post('/api/telegram/webhook', async (req, res) => {
       const chatId = callback_query.message.chat.id;
       const messageId = callback_query.message.message_id;
 
-      // ACC/REJECT
       if (data.startsWith('acc_') || data.startsWith('reject_')) {
         const [action, requestId] = data.split('_');
         const [rows] = await pool.query('SELECT * FROM pending_sales WHERE id = ?', [requestId]);
@@ -1517,7 +1510,6 @@ app.post('/api/telegram/webhook', async (req, res) => {
         }
       }
 
-      // BUTTON COMMANDS
       else if (data === 'cmd_pending') {
         const [rows] = await pool.query('SELECT * FROM pending_sales WHERE status = "pending_approval" ORDER BY id DESC');
         if (rows.length === 0) {
@@ -1640,7 +1632,6 @@ app.post('/api/telegram/webhook', async (req, res) => {
         );
       }
 
-      // Acknowledge callback
       await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1665,7 +1656,6 @@ app.get('/api/tools/tiktok', async (req, res) => {
 
   const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-  // ============ SUMBER 1: TIKWM ============
   try {
     const r1 = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}&hd=1`, {
       headers: { 'User-Agent': userAgent, 'Accept': 'application/json' }
@@ -1698,7 +1688,6 @@ app.get('/api/tools/tiktok', async (req, res) => {
     console.warn('[TIKTOK] TikWM gagal:', e.message);
   }
 
-  // ============ SUMBER 2: DOUYIN.WTF ============
   try {
     const r2 = await fetch(`https://api.douyin.wtf/api/hybrid/video_data?url=${encodeURIComponent(url)}&minimal=false`, {
       headers: { 'User-Agent': userAgent, 'Accept': 'application/json' }
@@ -1742,33 +1731,8 @@ app.get('/api/tools/tiktok', async (req, res) => {
 });
 
 // =========================================================================
-// 📌 UPLOAD IMAGE TO URL (MULTI-FALLBACK: Catbox → ImgBB → Uguu)
+// 📌 UPLOAD IMAGE TO URL (MULTI-FALLBACK)
 // =========================================================================
-
-// Middleware buat terima file upload (tanpa perlu install multer)
-// Pakai raw body + boundary parsing sederhana
-app.use('/api/tools/upload', express.raw({ 
-  type: ['image/*', 'application/octet-stream'], 
-  limit: '10mb' 
-}));
-
-app.post('/api/tools/upload', async (req, res) => {
-  try {
-    // Terima file dari FormData di frontend
-    // req.body bakal jadi Buffer kalau content-type image/*
-    // Tapi karena frontend kirim FormData, kita handle multipart manual
-    // Fallback: pakai endpoint yang terima base64 JSON
-    
-    return res.status(400).json({ 
-      success: false, 
-      message: 'Gunakan endpoint /api/tools/upload-base64' 
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// Endpoint utama: terima base64 image dari frontend
 app.post('/api/tools/upload-base64', async (req, res) => {
   const { image, filename } = req.body;
 
@@ -1776,7 +1740,6 @@ app.post('/api/tools/upload-base64', async (req, res) => {
     return res.status(400).json({ success: false, message: 'Data image wajib dikirim!' });
   }
 
-  // Bersihin prefix data:image/xxx;base64,
   const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
   const buffer = Buffer.from(base64Data, 'base64');
 
@@ -1786,88 +1749,67 @@ app.post('/api/tools/upload-base64', async (req, res) => {
 
   const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-  // ============ SUMBER 1: CATBOX.MOE ============
+  // CATBOX
   try {
     const formData = new FormData();
     formData.append('reqtype', 'fileupload');
     formData.append('fileToUpload', new Blob([buffer], { type: 'image/jpeg' }), filename || 'upload.jpg');
 
     const r1 = await fetch('https://catbox.moe/user/api.php', {
-      method: 'POST',
-      body: formData,
-      headers: { 'User-Agent': userAgent }
+      method: 'POST', body: formData, headers: { 'User-Agent': userAgent }
     });
 
     const url1 = (await r1.text()).trim();
-
     if (url1 && url1.startsWith('http')) {
       return res.json({ success: true, source: 'catbox', url: url1 });
     }
-  } catch (e) {
-    console.warn('[UPLOAD] Catbox gagal:', e.message);
-  }
+  } catch (e) { console.warn('[UPLOAD] Catbox gagal:', e.message); }
 
-  // ============ SUMBER 2: UGUU.SE (GRATIS, NO KEY) ============
+  // UGUU
   try {
     const formData2 = new FormData();
     formData2.append('files[]', new Blob([buffer], { type: 'image/jpeg' }), filename || 'upload.jpg');
 
     const r2 = await fetch('https://uguu.se/upload.php', {
-      method: 'POST',
-      body: formData2,
-      headers: { 'User-Agent': userAgent }
+      method: 'POST', body: formData2, headers: { 'User-Agent': userAgent }
     });
 
     const d2 = await r2.json();
-
     if (d2 && d2.success && d2.files && d2.files[0] && d2.files[0].url) {
       return res.json({ success: true, source: 'uguu', url: d2.files[0].url });
     }
-  } catch (e) {
-    console.warn('[UPLOAD] Uguu gagal:', e.message);
-  }
+  } catch (e) { console.warn('[UPLOAD] Uguu gagal:', e.message); }
 
-  // ============ SUMBER 3: TMPFILES.ORG (GRATIS, NO KEY) ============
+  // TMPFILES
   try {
     const formData3 = new FormData();
     formData3.append('file', new Blob([buffer], { type: 'image/jpeg' }), filename || 'upload.jpg');
 
     const r3 = await fetch('https://tmpfiles.org/api/v1/upload', {
-      method: 'POST',
-      body: formData3,
-      headers: { 'User-Agent': userAgent }
+      method: 'POST', body: formData3, headers: { 'User-Agent': userAgent }
     });
 
     const d3 = await r3.json();
-
     if (d3 && d3.status === 'success' && d3.data && d3.data.url) {
-      // Tmpfiles kasih URL halaman, convert ke direct link
       const directUrl = d3.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
       return res.json({ success: true, source: 'tmpfiles', url: directUrl });
     }
-  } catch (e) {
-    console.warn('[UPLOAD] Tmpfiles gagal:', e.message);
-  }
+  } catch (e) { console.warn('[UPLOAD] Tmpfiles gagal:', e.message); }
 
-  // ============ SUMBER 4: 0X0.ST (GRATIS, NO KEY) ============
+  // 0X0.ST
   try {
     const formData4 = new FormData();
     formData4.append('file', new Blob([buffer], { type: 'image/jpeg' }), filename || 'upload.jpg');
 
     const r4 = await fetch('https://0x0.st', {
-      method: 'POST',
-      body: formData4,
-      headers: { 'User-Agent': userAgent }
+      method: 'POST', body: formData4, headers: { 'User-Agent': userAgent }
     });
 
     const url4 = (await r4.text()).trim();
-
     if (url4 && url4.startsWith('http')) {
       return res.json({ success: true, source: '0x0.st', url: url4 });
     }
-  } catch (e) {
-    console.warn('[UPLOAD] 0x0.st gagal:', e.message);
-  }
+  } catch (e) { console.warn('[UPLOAD] 0x0.st gagal:', e.message); }
 
   return res.status(500).json({
     success: false,
