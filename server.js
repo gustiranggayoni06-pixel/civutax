@@ -204,7 +204,7 @@ async function sendTelegramNotification(pendingData) {
 // 📌 ROOT ROUTE
 // =========================================================================
 app.get('/', (req, res) => {
-  res.send('Server Backend CIVUTAX Berjalan Lancar!');
+  res.sendFile(this.path.join(__dirname, 'index.html'));
 });
 
 // =========================================================================
