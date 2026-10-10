@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Panel ACC Developer & Management User - CIVUTAX</title>
+  <style>
+    :root {
+      --bg-body: #090d16;
+      --bg-card: #151c2c;
+      --bg-nav: rgba(21, 28, 44, 0.92);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-color: #26334d;
+      --accent: #a855f7;
+      --accent-glow: rgba(168, 85, 247, 0.2);
+      --danger: #ef4444;
+      --danger-glow: rgba(239, 68, 68, 0.2);
+      --success: #10b981;
+      --warning: #eab308;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg-body);
+      color: var(--text-main);
+      padding: 1rem;
+      padding-bottom: 50px;
+    }
+
+    .header-panel {
+      max-width: 800px;
+      margin: 0 auto 1rem auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--bg-card);
+      padding: 1rem 1.25rem;
+      border-radius: 14px;
+      border: 1px solid var(--border-color);
+      gap: 0.75rem;
+    }
+
+    .header-panel h2 {
+      font-size: 1.1rem;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn-refresh {
+      background: rgba(168, 85, 247, 0.15);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      padding: 0.5rem 0.85rem;
+      border-radius: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 0.82rem;
+    }
+
+    .btn-refresh:active { transform: scale(0.95); }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .dev-subnav {
+      display: flex;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 0.35rem;
+      margin-bottom: 1.25rem;
+      gap: 0.35rem;
+      overflow-x: auto;
+    }
+
+    .dev-subtab-btn {
+      flex: 1;
+      min-height: 42px;
+      padding: 0.5rem 0.65rem;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+      border-radius: 10px;
+      cursor: pointer;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      transition: all 0.2s ease;
+    }
+
+    .dev-subtab-btn.active {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 4px 12px var(--accent-glow);
+    }
+
+    .dev-subcontent { display: none; }
+    .dev-subcontent.active { display: block; }
+
+    .card {
+      background: var(--bg-card);
+      padding: 1.25rem;
+      border-radius: 14px;
+      border: 1px solid var(--border-color);
+      margin-bottom: 1rem;
+    }
+
+    .pending-item {
+      background: var(--bg-body);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      position: relative;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .pending-item.selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-glow);
+    }
+
+    .pending-item-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 0.5rem;
+      gap: 0.5rem;
+    }
+
+    .pending-header {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      font-size: 0.85rem;
+      flex: 1;
+    }
+
+    .checkbox-log {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      border: 2px solid var(--border-color);
+      background: var(--bg-card);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .checkbox-log:checked {
+      background: var(--accent);
+      border-color: var(--accent);
+      box-shadow: 0 0 8px var(--accent-glow);
+    }
+
+    .checkbox-log:checked::after {
+      content: '';
+      width: 6px;
+      height: 11px;
+      border: solid #fff;
+      border-width: 0 2.5px 2.5px 0;
+      transform: rotate(45deg) translate(-1px, -2px);
+    }
+
+    .badge-pending {
+      background: rgba(234, 179, 8, 0.15);
+      color: var(--warning);
+      border: 1px solid var(--warning);
+      padding: 0.2rem 0.6rem;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      display: inline-block;
+      width: fit-content;
+    }
+
+    .info-row {
+      font-size: 0.88rem;
+      margin-bottom: 0.35rem;
+      color: var(--text-muted);
+    }
+
+    .info-row strong { color: var(--text-main); }
+
+    .info-row code {
+      background: rgba(168, 85, 247, 0.1);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      color: var(--accent);
+      font-size: 0.85rem;
+    }
+
+    .action-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-top: 0.85rem;
+    }
+
+    .btn-acc {
+      background: var(--success);
+      color: #fff;
+      border: none;
+      padding: 0.65rem;
+      border-radius: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+
+    .btn-acc:active { transform: scale(0.97); }
+
+    .btn-reject {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid var(--danger);
+      color: var(--danger);
+      padding: 0.65rem;
+      border-radius: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+
+    .btn-reject:active { transform: scale(0.97); }
+
+    /* ====== TOOLBAR PEMBERSIHAN LOG ====== */
+    .log-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      padding: 0.75rem;
+      background: rgba(168, 85, 247, 0.06);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      align-items: center;
+    }
+
+    .log-toolbar .toolbar-info {
+      flex: 1;
+      min-width: 120px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .log-toolbar .toolbar-info strong {
+      color: var(--accent);
+    }
+
+    .toolbar-btn {
+      padding: 0.55rem 0.9rem;
+      border-radius: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 0.8rem;
+      border: 1px solid;
+      transition: transform 0.15s, background 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      white-space: nowrap;
+    }
+
+    .toolbar-btn:active { transform: scale(0.95); }
+
+    .toolbar-btn.select-all {
+      background: rgba(168, 85, 247, 0.15);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .toolbar-btn.delete-selected {
+      background: rgba(234, 179, 8, 0.15);
+      border-color: var(--warning);
+      color: var(--warning);
+    }
+
+    .toolbar-btn.delete-all {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    .toolbar-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* ====== USER TABLE ====== */
+    .user-table-wrapper { overflow-x: auto; }
+
+    table.user-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      text-align: left;
+    }
+
+    table.user-table th, table.user-table td {
+      padding: 0.75rem 0.85rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    table.user-table th {
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--accent);
+    }
+
+    table.user-table tr.row-selected {
+      background: rgba(168, 85, 247, 0.08);
+    }
+
+    .checkbox-user {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 5px;
+      border: 2px solid var(--border-color);
+      background: var(--bg-card);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      vertical-align: middle;
+    }
+
+    .checkbox-user:checked {
+      background: var(--accent);
+      border-color: var(--accent);
+      box-shadow: 0 0 8px var(--accent-glow);
+    }
+
+    .checkbox-user:checked::after {
+      content: '';
+      width: 5px;
+      height: 10px;
+      border: solid #fff;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg) translate(-1px, -2px);
+    }
+
+    .form-group-dev { margin-bottom: 1rem; }
+
+    .form-group-dev label {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 0.4rem;
+    }
+
+    .form-group-dev input, .form-group-dev select {
+      width: 100%;
+      min-height: 44px;
+      padding: 0.7rem;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-body);
+      color: var(--text-main);
+      outline: none;
+    }
+
+    .btn-submit-dev {
+      width: 100%;
+      min-height: 44px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .btn-delete-dev {
+      width: 100%;
+      min-height: 44px;
+      background: var(--danger);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translate(-50%, -150%);
+      background: var(--bg-card);
+      color: var(--text-main);
+      padding: 0.85rem 1.25rem;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      font-size: 0.88rem;
+      font-weight: 600;
+      z-index: 9999;
+      transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1);
+      max-width: 90vw;
+    }
+
+    .toast.show { transform: translate(-50%, 0); }
+    .toast.success { border-color: var(--success); color: #86efac; }
+    .toast.error { border-color: var(--danger); color: #fca5a5; }
+    .toast.info { border-color: var(--accent); color: #e9d5ff; }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <div class="header-panel">
+    <h2>⚡ Panel ACC Developer (Ranzz)</h2>
+    <button class="btn-refresh" onclick="loadAllDevData()">🔄 Muat Ulang</button>
+  </div>
+
+  <div class="container">
+
+    <nav class="dev-subnav">
+      <button class="dev-subtab-btn active" id="tabBtnAcc" onclick="switchDevTab('acc')">
+        <span>⚡ ACC Akun</span>
+      </button>
+      <button class="dev-subtab-btn" id="tabBtnUsers" onclick="switchDevTab('users')">
+        <span>👥 Database User</span>
+      </button>
+      <button class="dev-subtab-btn" id="tabBtnEdit" onclick="switchDevTab('edit')">
+        <span>✏️ Edit Akun</span>
+      </button>
+      <button class="dev-subtab-btn" id="tabBtnDelete" onclick="switchDevTab('delete')">
+        <span>🗑️ Hapus Akun</span>
+      </button>
+      <button class="dev-subtab-btn" id="tabBtnLogs" onclick="switchDevTab('logs')">
+        <span>📋 Log Sistem</span>
+      </button>
+    </nav>
+
+    <!-- SUB-TAB 1: LIST ACC AKUN -->
+    <div id="subContentAcc" class="dev-subcontent active">
+      <!-- TOOLBAR PEMBERSIHAN LOG ACC -->
+      <div class="log-toolbar">
+        <div class="toolbar-info">
+          Terpilih: <strong id="accSelectedCount">0</strong> / <span id="accTotalCount">0</span> log
+        </div>
+        <button class="toolbar-btn select-all" onclick="toggleSelectAllAcc()" id="btnSelectAllAcc">
+          ☑️ Pilih Semua
+        </button>
+        <button class="toolbar-btn delete-selected" onclick="deleteSelectedAccLogs()" id="btnDeleteSelectedAcc" disabled>
+          🗑️ Hapus Terpilih
+        </button>
+        <button class="toolbar-btn delete-all" onclick="deleteAllAccLogs()">
+          💥 Hapus Semua
+        </button>
+      </div>
+
+      <div id="pendingListContainer">
+        <div style="text-align: center; color: var(--text-muted); margin: 2rem 0;">Memuat antrean pengajuan...</div>
+      </div>
+    </div>
+
+    <!-- SUB-TAB 2: DATABASE SEMUA USER -->
+    <div id="subContentUsers" class="dev-subcontent">
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+          <h3 style="color: var(--accent); font-size: 0.95rem;">👥 Data Seluruh User Terdaftar</h3>
+          <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+            <button class="toolbar-btn select-all" onclick="toggleSelectAllUsers()" id="btnSelectAllUsers">
+              ☑️ Pilih Semua
+            </button>
+            <button class="toolbar-btn delete-selected" onclick="deleteSelectedUsers()" id="btnDeleteSelectedUsers" disabled>
+              🗑️ Hapus Terpilih (<span id="userSelectedCount">0</span>)
+            </button>
+          </div>
+        </div>
+        <div class="user-table-wrapper">
+          <table class="user-table">
+            <thead>
+              <tr>
+                <th style="width: 40px; text-align:center;">✓</th>
+                <th>ID</th>
+                <th>Username</th>
+                <th>Password</th>
+                <th>Role / Paket</th>
+                <th>Pembuat</th>
+              </tr>
+            </thead>
+            <tbody id="userTableBody">
+              <tr><td colspan="6" style="text-align:center; color:var(--text-muted);">Memuat data database...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUB-TAB 3: EDIT AKUN -->
+    <div id="subContentEdit" class="dev-subcontent">
+      <div class="card">
+        <h3 style="color: var(--accent); margin-bottom: 1rem; font-size: 0.95rem;">✏️ Edit Password / Role Akun Target</h3>
+        
+        <div class="form-group-dev">
+          <label for="editUsernameTarget">Username Target:</label>
+          <input type="text" id="editUsernameTarget" placeholder="Masukkan username target">
+        </div>
+
+        <div class="form-group-dev">
+          <label for="editNewPassword">Password Baru (Opsional):</label>
+          <input type="text" id="editNewPassword" placeholder="Biarkan kosong jika tidak diubah">
+        </div>
+
+        <button class="btn-submit-dev" onclick="submitDevEditUser()">💾 Simpan Perubahan Akun</button>
+      </div>
+    </div>
+
+    <!-- SUB-TAB 4: HAPUS AKUN -->
+    <div id="subContentDelete" class="dev-subcontent">
+      <div class="card" style="border-color: var(--danger);">
+        <h3 style="color: var(--danger); margin-bottom: 1rem; font-size: 0.95rem;">🗑️ Hapus Akun Pengguna Permanen</h3>
+        
+        <div class="form-group-dev">
+          <label for="deleteUsernameTarget">Username Akun yang Ingin Dihapus:</label>
+          <input type="text" id="deleteUsernameTarget" placeholder="Masukkan username target hapus">
+        </div>
+
+        <button class="btn-delete-dev" onclick="submitDevDeleteUser()">🚨 Hapus Akun Dari Database</button>
+      </div>
+    </div>
+
+    <!-- SUB-TAB 5: LOG SISTEM (BARU) -->
+    <div id="subContentLogs" class="dev-subcontent">
+      <div class="log-toolbar">
+        <div class="toolbar-info">
+          Log Sistem Terpilih: <strong id="sysSelectedCount">0</strong> / <span id="sysTotalCount">0</span>
+        </div>
+        <button class="toolbar-btn select-all" onclick="toggleSelectAllSysLogs()" id="btnSelectAllSysLogs">
+          ☑️ Pilih Semua
+        </button>
+        <button class="toolbar-btn delete-selected" onclick="deleteSelectedSysLogs()" id="btnDeleteSelectedSysLogs" disabled>
+          🗑️ Hapus Terpilih
+        </button>
+        <button class="toolbar-btn delete-all" onclick="deleteAllSysLogs()">
+          💥 Hapus Semua Log
+        </button>
+      </div>
+
+      <div id="sysLogsContainer">
+        <div style="text-align: center; color: var(--text-muted); margin: 2rem 0;">Memuat log sistem...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const API_BASE_URL = 'https://civutax-s9zn.vercel.app';
+
+    // State global
+    let accLogsData = [];
+    let selectedAccLogs = new Set();
+    let usersData = [];
+    let selectedUsers = new Set();
+    let sysLogsData = [];
+    let selectedSysLogs = new Set();
+
+    // ============ TOAST ============
+    let toastTimer = null;
+    function showToast(text, type = 'info', duration = 2400) {
+      const toast = document.getElementById('toast');
+      if (!toast) return;
+      toast.className = 'toast show ' + type;
+      toast.textContent = text;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), duration);
+    }
+
+    // ============ TAB SWITCH ============
+    function switchDevTab(tabName) {
+      document.querySelectorAll('.dev-subtab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.dev-subcontent').forEach(c => c.classList.remove('active'));
+
+      if (tabName === 'acc') {
+        document.getElementById('tabBtnAcc').classList.add('active');
+        document.getElementById('subContentAcc').classList.add('active');
+        loadPendingList();
+      } else if (tabName === 'users') {
+        document.getElementById('tabBtnUsers').classList.add('active');
+        document.getElementById('subContentUsers').classList.add('active');
+        loadAllUsersDatabase();
+      } else if (tabName === 'edit') {
+        document.getElementById('tabBtnEdit').classList.add('active');
+        document.getElementById('subContentEdit').classList.add('active');
+      } else if (tabName === 'delete') {
+        document.getElementById('tabBtnDelete').classList.add('active');
+        document.getElementById('subContentDelete').classList.add('active');
+      } else if (tabName === 'logs') {
+        document.getElementById('tabBtnLogs').classList.add('active');
+        document.getElementById('subContentLogs').classList.add('active');
+        loadSystemLogs();
+      }
+    }
+
+    // ============ ESCAPE HTML ============
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    // ============================================================
+    // ==== ACC LOGS (ANTREAN PENGAJUAN) ==========================
+    // ============================================================
+    async function loadPendingList() {
+      const container = document.getElementById('pendingListContainer');
+      container.innerHTML = '<div style="text-align: center; color: var(--text-muted); margin: 2rem 0;">Memuat antrean pengajuan...</div>';
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/sales/pending-list`);
+        const data = await res.json();
+
+        let rawList = [];
+        if (Array.isArray(data)) rawList = data;
+        else if (data && typeof data === 'object') rawList = data.requests || data.data || data.sales || data.list || [];
+
+        // Filter hanya yang pending_approval
+        accLogsData = rawList.filter(r => {
+          const st = String(r.status || '').toLowerCase();
+          return st === 'pending_approval' || st === 'pending';
+        });
+
+        selectedAccLogs.clear();
+        updateAccToolbar();
+
+        if (accLogsData.length === 0) {
+          container.innerHTML = '<div class="card" style="text-align: center; color: var(--text-muted);">✅ Tidak ada antrean pengajuan akun baru saat ini.</div>';
+          return;
+        }
+
+        container.innerHTML = accLogsData.map(req => {
+          const isSelected = selectedAccLogs.has(req.id);
+          return `
+            <div class="pending-item ${isSelected ? 'selected' : ''}" id="accItem-${req.id}">
+              <div class="pending-item-top">
+                <div class="pending-header">
+                  <span style="color: var(--text-muted); font-size: 0.8rem;">
+                    ID: <strong>#${req.id}</strong> • Pembuat: <strong>${escapeHtml(req.created_by)}</strong> (${escapeHtml(req.creator_role || 'User')})
+                  </span>
+                  <span class="badge-pending">⏳ MENUNGGU ACC</span>
+                </div>
+                <input type="checkbox" class="checkbox-log" 
+                  ${isSelected ? 'checked' : ''}
+                  onchange="toggleAccLog(${req.id})">
+              </div>
+              <div class="info-row">Username: <strong>${escapeHtml(req.buyer_username)}</strong></div>
+              <div class="info-row">Password: <code>${escapeHtml(req.buyer_password)}</code></div>
+              <div class="info-row">Paket / Role: <strong>${escapeHtml(req.package_name)}</strong></div>
+              <div class="info-row">Total Bayar: <strong style="color: #34d399;">Rp${(Number(req.package_price) + Number(req.tax_amount)).toLocaleString('id-ID')}</strong></div>
+              
+              <div class="action-grid">
+                <button class="btn-acc" onclick="processApproval(${req.id}, 'approve')">✓ ACC & Aktifkan</button>
+                <button class="btn-reject" onclick="processApproval(${req.id}, 'reject')">✕ Tolak</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+      } catch (err) {
+        console.error('Load pending error:', err);
+        container.innerHTML = '<div class="card" style="text-align: center; color: var(--danger);">❌ Gagal terhubung ke server database.</div>';
+        accLogsData = [];
+        updateAccToolbar();
+      }
+    }
+
+    function toggleAccLog(id) {
+      if (selectedAccLogs.has(id)) selectedAccLogs.delete(id);
+      else selectedAccLogs.add(id);
+
+      const item = document.getElementById('accItem-' + id);
+      if (item) item.classList.toggle('selected', selectedAccLogs.has(id));
+
+      updateAccToolbar();
+    }
+
+    function toggleSelectAllAcc() {
+      if (selectedAccLogs.size === accLogsData.length) {
+        selectedAccLogs.clear();
+      } else {
+        accLogsData.forEach(r => selectedAccLogs.add(r.id));
+      }
+      renderAccSelection();
+      updateAccToolbar();
+    }
+
+    function renderAccSelection() {
+      accLogsData.forEach(r => {
+        const item = document.getElementById('accItem-' + r.id);
+        if (item) {
+          item.classList.toggle('selected', selectedAccLogs.has(r.id));
+          const cb = item.querySelector('.checkbox-log');
+          if (cb) cb.checked = selectedAccLogs.has(r.id);
+        }
+      });
+    }
+
+    function updateAccToolbar() {
+      document.getElementById('accSelectedCount').textContent = selectedAccLogs.size;
+      document.getElementById('accTotalCount').textContent = accLogsData.length;
+      document.getElementById('btnDeleteSelectedAcc').disabled = selectedAccLogs.size === 0;
+
+      const btnSelAll = document.getElementById('btnSelectAllAcc');
+      if (btnSelAll) {
+        const allSelected = accLogsData.length > 0 && selectedAccLogs.size === accLogsData.length;
+        btnSelAll.innerHTML = allSelected ? '☒ Batal Pilih' : '☑️ Pilih Semua';
+      }
+    }
+
+    // HAPUS LOG ACC (PER-ITEM)
+    async function deleteSelectedAccLogs() {
+      const ids = Array.from(selectedAccLogs);
+      if (ids.length === 0) return showToast('Tidak ada log yang dipilih!', 'error');
+
+      const confirmDel = confirm(`⚠️ Hapus ${ids.length} log pengajuan yang dipilih?`);
+      if (!confirmDel) return;
+
+      let successCount = 0;
+      for (const id of ids) {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/sales/delete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requestId: id, requested_by: 'Ranzz' })
+          });
+          const data = await res.json();
+          if (data.success) successCount++;
+        } catch (e) {
+          console.error('Delete log error id ' + id, e);
+        }
+      }
+
+      showToast(`✓ ${successCount} log berhasil dihapus!`, 'success');
+      loadPendingList();
+    }
+
+    // HAPUS SEMUA LOG ACC
+    async function deleteAllAccLogs() {
+      if (accLogsData.length === 0) return showToast('Tidak ada log untuk dihapus!', 'error');
+
+      const confirmDel = confirm(`💥 HAPUS SEMUA ${accLogsData.length} log pengajuan ACC?\nTindakan ini tidak bisa dibatalkan!`);
+      if (!confirmDel) return;
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/sales/delete-all`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requested_by: 'Ranzz' })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(`✓ Semua log (${accLogsData.length}) berhasil dihapus!`, 'success');
+          loadPendingList();
+        } else {
+          showToast('Gagal: ' + (data.message || 'Error'), 'error');
+        }
+      } catch (e) {
+        console.error('Delete all acc error:', e);
+        showToast('Koneksi gagal!', 'error');
+      }
+    }
+
+    // PROSES ACC / REJECT
+    async function processApproval(requestId, action) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/sales/approve`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requestId, action })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          showToast('✓ Status pengajuan berhasil diperbarui!', 'success');
+          loadPendingList();
+        } else {
+          showToast('Gagal: ' + (data.message || 'Error'), 'error');
+        }
+      } catch (err) {
+        showToast('Kesalahan jaringan.', 'error');
+      }
+    }
+
+    // ============================================================
+    // ==== USER DATABASE + HAPUS MASSAL =========================
+    // ============================================================
+    async function loadAllUsersDatabase() {
+      const tbody = document.getElementById('userTableBody');
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted);">Memuat data database...</td></tr>';
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/users/all`);
+        const data = await res.json();
+
+        usersData = (data && Array.isArray(data.users)) ? data.users : [];
+        selectedUsers.clear();
+        updateUserToolbar();
+
+        if (usersData.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted);">Belum ada user terdaftar di database.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = usersData.map(u => {
+          const isSelected = selectedUsers.has(u.username);
+          const isProtected = String(u.username || '').toLowerCase() === 'ranzz';
+          return `
+            <tr class="${isSelected ? 'row-selected' : ''}" id="userRow-${escapeHtml(u.username)}">
+              <td style="text-align:center;">
+                <input type="checkbox" class="checkbox-user"
+                  ${isSelected ? 'checked' : ''}
+                  ${isProtected ? 'disabled title="Tidak bisa dihapus"' : ''}
+                  onchange="toggleUserSelect('${escapeHtml(u.username)}', ${isProtected})">
+              </td>
+              <td>${u.id}</td>
+              <td><strong>${escapeHtml(u.username)}</strong></td>
+              <td><code>${escapeHtml(u.password)}</code></td>
+              <td>${escapeHtml(u.role || 'User')}</td>
+              <td>${escapeHtml(u.created_by || 'system')}</td>
+            </tr>
+          `;
+        }).join('');
+
+      } catch (e) {
+        console.error('Gagal muat user DB:', e);
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--danger);">Gagal memuat database user.</td></tr>';
+      }
+    }
+
+    function toggleUserSelect(username, isProtected) {
+      if (isProtected) return;
+      if (selectedUsers.has(username)) selectedUsers.delete(username);
+      else selectedUsers.add(username);
+
+      const row = document.getElementById('userRow-' + username);
+      if (row) row.classList.toggle('row-selected', selectedUsers.has(username));
+
+      updateUserToolbar();
+    }
+
+    function toggleSelectAllUsers() {
+      // Jangan include 'ranzz' (protected)
+      const selectable = usersData.filter(u => String(u.username || '').toLowerCase() !== 'ranzz');
+      if (selectedUsers.size === selectable.length && selectable.length > 0) {
+        selectedUsers.clear();
+      } else {
+        selectedUsers.clear();
+        selectable.forEach(u => selectedUsers.add(u.username));
+      }
+      renderUserSelection();
+      updateUserToolbar();
+    }
+
+    function renderUserSelection() {
+      usersData.forEach(u => {
+        const row = document.getElementById('userRow-' + u.username);
+        if (row) {
+          row.classList.toggle('row-selected', selectedUsers.has(u.username));
+          const cb = row.querySelector('.checkbox-user');
+          if (cb && !cb.disabled) cb.checked = selectedUsers.has(u.username);
+        }
+      });
+    }
+
+    function updateUserToolbar() {
+      document.getElementById('userSelectedCount').textContent = selectedUsers.size;
+      document.getElementById('btnDeleteSelectedUsers').disabled = selectedUsers.size === 0;
+    }
+
+    async function deleteSelectedUsers() {
+      const users = Array.from(selectedUsers);
+      if (users.length === 0) return showToast('Tidak ada user yang dipilih!', 'error');
+
+      const confirmDel = confirm(`⚠️ Hapus ${users.length} user terpilih secara permanen?\nTindakan ini tidak bisa dibatalkan!`);
+      if (!confirmDel) return;
+
+      let success = 0;
+      for (const uname of users) {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/users/delete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username: uname,
+              requested_by: 'Ranzz',
+              requested_role: 'Ranzz : DEVELOPER'
+            })
+          });
+          const data = await res.json();
+          if (data.success) success++;
+        } catch (e) { console.error('Delete user error:', e); }
+      }
+
+      showToast(`✓ ${success} user berhasil dihapus!`, 'success');
+      loadAllUsersDatabase();
+    }
+
+    // ============================================================
+    // ==== EDIT PASSWORD USER ===================================
+    // ============================================================
+    async function submitDevEditUser() {
+      const target = document.getElementById('editUsernameTarget').value.trim();
+      const newPwd = document.getElementById('editNewPassword').value.trim();
+
+      if (!target || !newPwd) {
+        showToast('Isi username target dan password baru!', 'error');
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/users/change-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: target, newPassword: newPwd, requested_by: 'Ranzz', requested_role: 'DEVELOPER' })
+        });
+        const data = await res.json();
+        showToast(data.message || 'Selesai', data.success ? 'success' : 'error');
+        if (data.success) {
+          document.getElementById('editUsernameTarget').value = '';
+          document.getElementById('editNewPassword').value = '';
+        }
+      } catch (e) {
+        showToast('Gagal mengubah password target.', 'error');
+      }
+    }
+
+    // ============================================================
+    // ==== HAPUS USER VIA FORM ==================================
+    // ============================================================
+    async function submitDevDeleteUser() {
+      const target = document.getElementById('deleteUsernameTarget').value.trim();
+      if (!target) return showToast('Masukkan username target yang ingin dihapus!', 'error');
+
+      const confirmDel = confirm(`⚠️ Apakah Anda yakin ingin MENGHAPUS akun '${target}' dari database secara permanen?`);
+      if (!confirmDel) return;
+
+      const activeSession = JSON.parse(localStorage.getItem('user_session')) || {};
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/users/delete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            username: target, 
+            requested_by: activeSession.username || 'Ranzz',
+            requested_role: activeSession.role || 'Ranzz : DEVELOPER'
+          })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+          showToast(`✅ ${data.message}`, 'success');
+          document.getElementById('deleteUsernameTarget').value = '';
+          loadAllUsersDatabase();
+        } else {
+          showToast(`❌ Gagal: ${data.message}`, 'error');
+        }
+      } catch (err) {
+        console.error('Delete User Error:', err);
+        showToast('Kesalahan koneksi ke server.', 'error');
+      }
+    }
+
+    // ============================================================
+    // ==== LOG SISTEM (SEMUA RIWAYAT) ===========================
+    // ============================================================
+    async function loadSystemLogs() {
+      const container = document.getElementById('sysLogsContainer');
+      container.innerHTML = '<div style="text-align: center; color: var(--text-muted); margin: 2rem 0;">Memuat log sistem...</div>';
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/sales/pending-list`);
+        const data = await res.json();
+
+        let rawList = [];
+        if (Array.isArray(data)) rawList = data;
+        else if (data && typeof data === 'object') rawList = data.requests || data.data || data.sales || data.list || [];
+
+        sysLogsData = rawList;
+        selectedSysLogs.clear();
+        updateSysToolbar();
+
+        if (sysLogsData.length === 0) {
+          container.innerHTML = '<div class="card" style="text-align: center; color: var(--text-muted);">📭 Belum ada log sistem.</div>';
+          return;
+        }
+
+        container.innerHTML = sysLogsData.map(log => {
+          const isSelected = selectedSysLogs.has(log.id);
+          const stLower = String(log.status || '').toLowerCase();
+          let badge = `<span class="badge-pending">⏳ PENDING</span>`;
+          if (stLower === 'approved' || stLower === 'acc') {
+            badge = `<span class="badge-pending" style="background:rgba(34,197,94,0.15);color:#22c55e;border-color:#22c55e;">✓ APPROVED</span>`;
+          } else if (stLower === 'rejected' || stLower === 'ditolak') {
+            badge = `<span class="badge-pending" style="background:rgba(239,68,68,0.15);color:#ef4444;border-color:#ef4444;">✕ REJECTED</span>`;
+          }
+
+          return `
+            <div class="pending-item ${isSelected ? 'selected' : ''}" id="sysItem-${log.id}">
+              <div class="pending-item-top">
+                <div class="pending-header">
+                  <span style="color: var(--text-muted); font-size: 0.8rem;">
+                    ID: <strong>#${log.id}</strong> • Dari: <strong>${escapeHtml(log.created_by || 'unknown')}</strong>
+                  </span>
+                  ${badge}
+                </div>
+                <input type="checkbox" class="checkbox-log"
+                  ${isSelected ? 'checked' : ''}
+                  onchange="toggleSysLog(${log.id})">
+              </div>
+              <div class="info-row">Username: <strong>${escapeHtml(log.buyer_username || '-')}</strong></div>
+              <div class="info-row">Paket: <strong>${escapeHtml(log.package_name || '-')}</strong></div>
+              <div class="info-row">Tanggal: <strong>${log.created_at ? new Date(log.created_at).toLocaleString('id-ID') : '-'}</strong></div>
+            </div>
+          `;
+        }).join('');
+
+      } catch (err) {
+        console.error('Load system logs error:', err);
+        container.innerHTML = '<div class="card" style="text-align: center; color: var(--danger);">❌ Gagal memuat log sistem.</div>';
+      }
+    }
+
+    function toggleSysLog(id) {
+      if (selectedSysLogs.has(id)) selectedSysLogs.delete(id);
+      else selectedSysLogs.add(id);
+
+      const item = document.getElementById('sysItem-' + id);
+      if (item) item.classList.toggle('selected', selectedSysLogs.has(id));
+
+      updateSysToolbar();
+    }
+
+    function toggleSelectAllSysLogs() {
+      if (selectedSysLogs.size === sysLogsData.length) {
+        selectedSysLogs.clear();
+      } else {
+        sysLogsData.forEach(l => selectedSysLogs.add(l.id));
+      }
+      renderSysSelection();
+      updateSysToolbar();
+    }
+
+    function renderSysSelection() {
+      sysLogsData.forEach(l => {
+        const item = document.getElementById('sysItem-' + l.id);
+        if (item) {
+          item.classList.toggle('selected', selectedSysLogs.has(l.id));
+          const cb = item.querySelector('.checkbox-log');
+          if (cb) cb.checked = selectedSysLogs.has(l.id);
+        }
+      });
+    }
+
+    function updateSysToolbar() {
+      document.getElementById('sysSelectedCount').textContent = selectedSysLogs.size;
+      document.getElementById('sysTotalCount').textContent = sysLogsData.length;
+      document.getElementById('btnDeleteSelectedSysLogs').disabled = selectedSysLogs.size === 0;
+
+      const btnSelAll = document.getElementById('btnSelectAllSysLogs');
+      if (btnSelAll) {
+        const allSelected = sysLogsData.length > 0 && selectedSysLogs.size === sysLogsData.length;
+        btnSelAll.innerHTML = allSelected ? '☒ Batal Pilih' : '☑️ Pilih Semua';
+      }
+    }
+
+    async function deleteSelectedSysLogs() {
+      const ids = Array.from(selectedSysLogs);
+      if (ids.length === 0) return showToast('Tidak ada log yang dipilih!', 'error');
+
+      const confirmDel = confirm(`⚠️ Hapus ${ids.length} log sistem terpilih?`);
+      if (!confirmDel) return;
+
+      let success = 0;
+      for (const id of ids) {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/sales/delete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requestId: id, requested_by: 'Ranzz' })
+          });
+          const data = await res.json();
+          if (data.success) success++;
+        } catch (e) { console.error('Delete sys log error:', e); }
+      }
+
+      showToast(`✓ ${success} log berhasil dihapus!`, 'success');
+      loadSystemLogs();
+    }
+
+    async function deleteAllSysLogs() {
+      if (sysLogsData.length === 0) return showToast('Tidak ada log untuk dihapus!', 'error');
+
+      const confirmDel = confirm(`💥 HAPUS SEMUA ${sysLogsData.length} log sistem?\nTindakan ini tidak bisa dibatalkan!`);
+      if (!confirmDel) return;
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/sales/delete-all`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requested_by: 'Ranzz' })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(`✓ Semua log (${sysLogsData.length}) berhasil dihapus!`, 'success');
+          loadSystemLogs();
+        } else {
+          showToast('Gagal: ' + (data.message || 'Error'), 'error');
+        }
+      } catch (e) {
+        console.error('Delete all sys logs error:', e);
+        showToast('Koneksi gagal!', 'error');
+      }
+    }
+
+    // ============================================================
+    // ==== LOAD ALL =============================================
+    // ============================================================
+    function loadAllDevData() {
+      loadPendingList();
+      loadAllUsersDatabase();
+    }
+
+    window.addEventListener('DOMContentLoaded', loadAllDevData);
+  </script>
+</body>
+</html>
