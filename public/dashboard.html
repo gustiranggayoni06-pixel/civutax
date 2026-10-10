@@ -1,0 +1,3204 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>CIVUTAX Dashboard</title>
+  <style>
+    :root {
+      --bg-body: #090d16;
+      --bg-card: #151c2c;
+      --bg-nav: rgba(21, 28, 44, 0.92);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-color: #26334d;
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.15);
+      --dev-color: #a855f7;
+    }
+
+    body.light-theme {
+      --bg-body: #f8fafc;
+      --bg-card: #ffffff;
+      --bg-nav: rgba(255, 255, 255, 0.92);
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border-color: #e2e8f0;
+      --accent: #0284c7;
+      --accent-glow: rgba(2, 132, 199, 0.1);
+      --dev-color: #7e22ce;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body { width: 100%; min-height: 100%; }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg-body);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      padding-bottom: 250px;
+    }
+
+    .top-header {
+      background: var(--bg-nav);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand { display: flex; align-items: center; gap: 0.75rem; }
+
+    .brand-logo {
+      width: 38px; height: 38px;
+      border-radius: 10px; object-fit: cover;
+      border: 1.5px solid var(--accent);
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    .brand-name {
+      font-size: 1.2rem; font-weight: 800;
+      letter-spacing: 0.8px; color: var(--text-main);
+    }
+
+    .brand-name span { color: var(--accent); }
+
+    .hamburger-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      user-select: none;
+    }
+
+    .hamburger-btn:active { transform: scale(0.92); border-color: var(--accent); }
+
+    .menu-overlay {
+      position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 998;
+      opacity: 0; visibility: hidden;
+      transition: opacity 0.2s ease, visibility 0.2s ease;
+    }
+
+    .menu-overlay.active { opacity: 1; visibility: visible; }
+
+    .drawer-menu {
+      position: fixed; top: 0; right: -320px;
+      width: 290px; height: 100%;
+      background: var(--bg-card);
+      border-left: 1px solid var(--border-color);
+      z-index: 999;
+      display: flex; flex-direction: column;
+      transition: right 0.25s cubic-bezier(0.1, 0.9, 0.2, 1);
+      box-shadow: -10px 0 30px rgba(0, 0, 0, 0.4);
+      overflow-y: auto;
+    }
+
+    .drawer-menu.active { right: 0; }
+
+    .drawer-header {
+      padding: 1.25rem 1.25rem;
+      border-bottom: 1px solid var(--border-color);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+
+    .drawer-title { font-weight: 700; font-size: 1.05rem; color: var(--text-main); }
+
+    .close-btn {
+      background: none; border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .close-btn:active { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+
+    .access-info-box {
+      margin: 1rem 1rem 0.5rem 1rem;
+      padding: 1rem;
+      background: rgba(168, 85, 247, 0.08);
+      border: 1px solid var(--dev-color);
+      border-radius: 12px;
+    }
+
+    .access-info-title {
+      font-size: 0.75rem; font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+      display: flex; align-items: center; gap: 0.4rem;
+    }
+
+    .access-badge {
+      display: inline-block;
+      padding: 0.35rem 0.8rem;
+      border-radius: 20px;
+      font-size: 0.85rem; font-weight: 800;
+      background: rgba(168, 85, 247, 0.2);
+      color: var(--dev-color);
+      border: 1px solid var(--dev-color);
+    }
+
+    .drawer-list {
+      list-style: none;
+      padding: 0.5rem 0.75rem 1rem 0.75rem;
+      flex: 1;
+    }
+
+    .drawer-item a, .drawer-item button {
+      display: flex; align-items: center; gap: 0.85rem;
+      width: 100%; min-height: 48px;
+      padding: 0.8rem 1rem;
+      color: var(--text-main);
+      text-decoration: none;
+      font-size: 0.92rem;
+      background: none; border: none;
+      border-radius: 10px;
+      text-align: left; cursor: pointer;
+      font-weight: 600;
+    }
+
+    .drawer-item a:active, .drawer-item button:active {
+      background: var(--accent-glow);
+      color: var(--accent);
+      transform: scale(0.98);
+    }
+
+    .drawer-item svg {
+      width: 20px; height: 20px;
+      stroke: currentColor;
+      flex-shrink: 0;
+    }
+
+    .drawer-item.up-role-item button { color: #eab308; font-weight: 700; }
+    .drawer-item.logout-item button { color: #ef4444; }
+
+    .main-container {
+      max-width: 800px;
+      margin: 1.25rem auto;
+      padding: 0 1rem 20px 1rem;
+      width: 100%; flex: 1;
+    }
+
+    .section-title-top {
+      font-size: 1.2rem; font-weight: 800;
+      color: var(--accent);
+      margin-bottom: 1rem;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+
+    .welcome-banner {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 1.25rem;
+      display: flex; align-items: center; gap: 1.25rem;
+      margin-bottom: 1.25rem;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    }
+
+    .user-avatar-lg {
+      width: 70px; height: 70px;
+      border-radius: 50%; object-fit: cover;
+      border: 2.5px solid var(--accent);
+      box-shadow: 0 0 15px var(--accent-glow);
+      flex-shrink: 0;
+    }
+
+    .welcome-text h1 { font-size: 1.25rem; font-weight: 700; color: var(--text-main); }
+
+    .telegram-card {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(14, 165, 233, 0.22));
+      border: 1px solid #0284c7;
+      border-radius: 16px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.25rem;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .telegram-info { display: flex; align-items: center; gap: 0.85rem; }
+
+    .telegram-icon {
+      width: 42px; height: 42px;
+      background: #0284c7;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; flex-shrink: 0;
+    }
+
+    .telegram-text h4 { font-size: 0.95rem; font-weight: 700; color: var(--text-main); }
+    .telegram-text p { font-size: 0.78rem; color: var(--text-muted); }
+
+    .telegram-btn {
+      padding: 0.6rem 1rem;
+      background: #0284c7;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 10px;
+      font-size: 0.82rem; font-weight: 700;
+      white-space: nowrap;
+      transition: background 0.2s;
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .grid-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .spec-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 18px;
+      padding: 1.25rem;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .spec-card:hover { border-color: var(--accent); }
+
+    .spec-card-header {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding-bottom: 0.85rem;
+      margin-bottom: 1rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .spec-header-icon {
+      width: 40px; height: 40px;
+      border-radius: 12px;
+      background: var(--accent-glow);
+      color: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
+    .spec-card-header h3 {
+      font-size: 1.05rem; font-weight: 800;
+      color: var(--text-main); margin: 0;
+    }
+
+    .spec-list {
+      display: flex; flex-direction: column;
+      gap: 0.85rem; list-style: none;
+    }
+
+    .spec-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.65rem 0.85rem;
+      background: var(--bg-body);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      transition: all 0.2s ease;
+    }
+
+    .spec-item:hover { background: rgba(255, 255, 255, 0.02); }
+    .spec-item-left { display: flex; align-items: center; gap: 0.65rem; }
+
+    .spec-item-icon {
+      width: 28px; height: 28px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-muted);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .spec-item-icon svg { width: 16px; height: 16px; stroke: currentColor; }
+
+    .spec-label { font-size: 0.82rem; font-weight: 600; color: var(--text-muted); }
+    .spec-value { font-size: 0.85rem; font-weight: 700; color: var(--text-main); text-align: right; }
+
+    .card {
+      background: var(--bg-card);
+      padding: 1.25rem;
+      border-radius: 14px;
+      border: 1px solid var(--border-color);
+      margin-bottom: 1rem;
+    }
+
+    .card-header-flex {
+      display: flex; justify-content: space-between; align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.6rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .card h3 {
+      color: var(--accent);
+      font-size: 1rem; font-weight: 700;
+      display: flex; align-items: center; gap: 0.5rem;
+      margin: 0;
+    }
+
+    .dev-clear-chat-btn {
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid #ef4444;
+      color: #ef4444;
+      font-size: 0.78rem; font-weight: 700;
+      padding: 0.4rem 0.75rem;
+      border-radius: 8px; cursor: pointer;
+      display: none; align-items: center; gap: 0.3rem;
+      z-index: 10;
+    }
+
+    .location-btn, .action-btn {
+      width: 100%; min-height: 46px;
+      margin-top: 0.85rem;
+      padding: 0.75rem 1rem;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      border-radius: 10px;
+      font-size: 0.88rem; font-weight: 700;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .price-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.75rem; margin-bottom: 1.25rem;
+    }
+
+    .price-item {
+      background: var(--bg-body);
+      border: 1px solid var(--border-color);
+      padding: 0.75rem;
+      border-radius: 10px;
+      text-align: center;
+    }
+
+    .price-item .title { font-size: 0.78rem; color: var(--text-muted); }
+    .price-item .cost { font-size: 0.95rem; font-weight: 800; color: #34d399; margin-top: 2px; }
+
+    .form-group-sale { margin-bottom: 1rem; }
+
+    .form-group-sale label {
+      display: block;
+      font-size: 0.85rem; color: var(--text-muted);
+      margin-bottom: 0.4rem;
+    }
+
+    .form-group-sale input, .form-group-sale select {
+      width: 100%; min-height: 46px;
+      padding: 0.7rem;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-body);
+      color: var(--text-main);
+      outline: none; font-size: 0.9rem;
+    }
+
+    .form-group-sale input[readonly] {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--accent);
+      font-weight: 800;
+      cursor: not-allowed;
+      border-color: rgba(56, 189, 248, 0.3);
+      letter-spacing: 1px;
+    }
+
+    .password-input-wrapper {
+      position: relative;
+      display: flex; align-items: center;
+    }
+
+    .password-input-wrapper input { padding-right: 45px; }
+
+    .toggle-pwd-btn {
+      position: absolute; right: 10px;
+      background: none; border: none;
+      color: var(--text-muted);
+      cursor: pointer; padding: 5px;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .username-status-msg {
+      font-size: 0.8rem;
+      margin-top: 0.35rem;
+      display: none; font-weight: 600;
+    }
+
+    .tax-box {
+      background: rgba(234, 179, 8, 0.1);
+      border: 1px solid #eab308;
+      border-radius: 10px;
+      padding: 0.85rem;
+      font-size: 0.85rem; color: #fef08a;
+      margin-top: 0.85rem;
+    }
+
+    .sales-subnav {
+      display: flex;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 0.35rem; margin-bottom: 1.25rem;
+      gap: 0.35rem; overflow-x: auto;
+    }
+
+    .sales-subtab-btn {
+      flex: 1; min-height: 42px;
+      padding: 0.5rem 0.65rem;
+      background: none; border: none;
+      color: var(--text-muted);
+      font-size: 0.78rem; font-weight: 700;
+      border-radius: 10px; cursor: pointer;
+      white-space: nowrap;
+      display: flex; align-items: center; justify-content: center;
+      gap: 0.4rem;
+      transition: all 0.2s ease;
+    }
+
+    .sales-subtab-btn.active {
+      background: var(--accent);
+      color: #000;
+      box-shadow: 0 4px 12px var(--accent-glow);
+    }
+
+    .sales-subcontent { display: none; }
+    .sales-subcontent.active { display: block; }
+
+    .summary-total-card {
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(16, 185, 129, 0.25));
+      border: 1.5px solid #22c55e;
+      border-radius: 14px;
+      padding: 1.25rem;
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+
+    .summary-total-card .title {
+      font-size: 0.85rem; font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .summary-total-card .amount {
+      font-size: 1.8rem; font-weight: 800;
+      color: #34d399; margin: 0.3rem 0;
+    }
+
+    .history-list {
+      display: flex; flex-direction: column;
+      gap: 0.75rem; margin-top: 0.75rem;
+      max-height: 400px; overflow-y: auto;
+    }
+
+    .history-card-item {
+      background: var(--bg-body);
+      border: 1px solid var(--border-color);
+      padding: 0.85rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+    }
+
+    .history-header-flex {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 0.4rem;
+    }
+
+    .history-buyer { font-weight: 700; color: var(--accent); }
+
+    .status-badge-pending {
+      background: rgba(234, 179, 8, 0.15);
+      color: #eab308;
+      border: 1px solid #eab308;
+      padding: 0.15rem 0.5rem;
+      border-radius: 12px;
+      font-size: 0.72rem; font-weight: 700;
+    }
+
+    .status-badge-approved {
+      background: rgba(34, 197, 94, 0.15);
+      color: #22c55e;
+      border: 1px solid #22c55e;
+      padding: 0.15rem 0.5rem;
+      border-radius: 12px;
+      font-size: 0.72rem; font-weight: 700;
+    }
+
+    .status-badge-rejected {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+      border: 1px solid #ef4444;
+      padding: 0.15rem 0.5rem;
+      border-radius: 12px;
+      font-size: 0.72rem; font-weight: 700;
+    }
+
+    .chat-card-wrapper { margin-bottom: 160px !important; padding-bottom: 1rem; }
+
+    .chat-messages {
+      height: 280px; overflow-y: auto;
+      background: var(--bg-body);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 0.85rem;
+      margin-bottom: 0.85rem;
+      display: flex; flex-direction: column;
+      gap: 0.65rem;
+      scroll-behavior: smooth;
+    }
+
+    .chat-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      padding: 0.7rem 0.9rem;
+      border-radius: 10px;
+      font-size: 0.9rem; line-height: 1.4;
+      word-break: break-word;
+      cursor: pointer; user-select: none;
+    }
+
+    .chat-user { font-weight: 700; color: var(--accent); margin-right: 0.4rem; }
+
+    .reply-preview-box {
+      display: none;
+      background: rgba(56, 189, 248, 0.1);
+      border-left: 3px solid var(--accent);
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      margin-bottom: 0.5rem;
+      font-size: 0.82rem;
+      justify-content: space-between; align-items: center;
+    }
+
+    .reply-preview-box .reply-info {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text-muted);
+    }
+
+    .reply-preview-box .reply-info strong { color: var(--accent); }
+
+    .reply-preview-box .close-reply-btn {
+      background: none; border: none;
+      color: #ef4444; font-weight: 700;
+      cursor: pointer; font-size: 1rem;
+      padding: 0 0.25rem;
+    }
+
+    .quoted-chat {
+      background: rgba(0,0,0,0.25);
+      border-left: 2.5px solid var(--accent);
+      padding: 0.35rem 0.5rem;
+      border-radius: 4px;
+      margin-bottom: 0.4rem;
+      font-size: 0.8rem; color: var(--text-muted);
+    }
+
+    .quoted-chat-user { color: var(--accent); font-weight: 700; }
+
+    .chat-input-group { display: flex; gap: 0.5rem; }
+
+    .chat-input-group input {
+      flex: 1; min-height: 46px;
+      padding: 0.7rem;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-body);
+      color: var(--text-main);
+      outline: none; font-size: 0.92rem;
+    }
+
+    .chat-input-group button {
+      min-height: 46px;
+      padding: 0.7rem 1.25rem;
+      background: var(--accent);
+      color: #000; border: none;
+      border-radius: 10px; font-weight: 700;
+      cursor: pointer;
+    }
+
+    .bottom-nav {
+      position: fixed; bottom: 12px; left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 24px); max-width: 450px;
+      height: 64px;
+      background: var(--bg-nav);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      display: flex; justify-content: space-around; align-items: center;
+      z-index: 1000;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    }
+
+    .bottom-nav-item {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.72rem; font-weight: 600;
+      background: none; border: none;
+      cursor: pointer;
+      width: 100%; height: 100%;
+      border-radius: 16px; gap: 3px;
+      transition: color 0.2s ease, transform 0.15s ease;
+    }
+
+    .bottom-nav-item svg {
+      width: 22px; height: 22px;
+      stroke: currentColor;
+      flex-shrink: 0;
+      transition: transform 0.2s ease;
+    }
+
+    .bottom-nav-item.active { color: var(--accent); }
+    .bottom-nav-item.active svg { transform: translateY(-2px); }
+
+    .modal-pwd-container {
+      position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      z-index: 2000;
+      display: none;
+      justify-content: center; align-items: center;
+      padding: 1rem;
+    }
+
+    .modal-pwd-content {
+      width: 100%; max-width: 380px;
+      margin: 0;
+    }
+
+    .termux-code-box {
+      background: #0a0f1a;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      padding: 0.85rem 1rem;
+      font-family: 'Courier New', monospace;
+      font-size: 0.78rem;
+      color: #7dd3fc;
+      line-height: 1.6;
+      overflow-x: auto;
+      white-space: pre;
+      margin: 0.65rem 0;
+      position: relative;
+    }
+
+    .copy-cmd-btn {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      padding: 0.25rem 0.55rem;
+      border-radius: 6px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .copy-cmd-btn:active {
+      background: var(--accent);
+      color: #000;
+    }
+
+    /* ===== TOOLS GRID ===== */
+    .tools-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .tool-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .tool-card:active {
+      transform: scale(0.97);
+      border-color: var(--accent);
+    }
+
+    .tool-card:hover {
+      border-color: var(--accent);
+      box-shadow: 0 8px 20px var(--accent-glow);
+    }
+
+    .tool-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .tool-info h4 {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: var(--text-main);
+      margin-bottom: 0.15rem;
+    }
+
+    .tool-info p {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* ===== TOOL MODAL ===== */
+    .tool-modal {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      z-index: 2500;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      padding: 1rem;
+    }
+
+    .tool-modal.active { display: flex; }
+
+    .tool-modal-content {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 18px;
+      padding: 1.5rem;
+      width: 100%;
+      max-width: 480px;
+      max-height: 90vh;
+      overflow-y: auto;
+      animation: cardEnter 0.3s ease;
+    }
+
+    .tool-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .tool-modal-header h3 {
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    .tool-modal-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 0 0.4rem;
+      line-height: 1;
+    }
+
+    .tool-modal-close:active { color: #ef4444; }
+
+    .tool-body label {
+      display: block;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      font-weight: 700;
+      margin-bottom: 0.35rem;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .tool-body input,
+    .tool-body textarea,
+    .tool-body select {
+      width: 100%;
+      padding: 0.75rem;
+      border-radius: 10px;
+      border: 1.5px solid var(--border-color);
+      background: var(--bg-body);
+      color: var(--text-main);
+      font-size: 0.9rem;
+      outline: none;
+      margin-bottom: 0.75rem;
+      font-family: inherit;
+    }
+
+    .tool-body input:focus,
+    .tool-body textarea:focus,
+    .tool-body select:focus {
+      border-color: var(--accent);
+    }
+
+    .tool-body textarea {
+      min-height: 90px;
+      resize: vertical;
+      font-family: 'Courier New', monospace;
+    }
+
+    .tool-body button {
+      width: 100%;
+      padding: 0.75rem;
+      border-radius: 10px;
+      border: none;
+      background: var(--accent);
+      color: #04121e;
+      font-size: 0.9rem;
+      font-weight: 800;
+      cursor: pointer;
+      margin-bottom: 0.5rem;
+    }
+
+    .tool-body button:active { transform: scale(0.98); }
+
+    .tool-body button.btn-secondary {
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+    }
+
+    .tool-result {
+      background: var(--bg-body);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 0.75rem;
+      font-size: 0.85rem;
+      color: var(--text-main);
+      word-break: break-all;
+      margin-top: 0.5rem;
+      display: none;
+      font-family: 'Courier New', monospace;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .tool-result.show { display: block; }
+
+    .tiktok-result {
+      display: none;
+      margin-top: 1rem;
+      background: var(--bg-body);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 0.85rem;
+    }
+
+    .tiktok-result.show { display: block; }
+
+    .tiktok-result img,
+    .tiktok-result video {
+      width: 100%;
+      border-radius: 8px;
+      margin-bottom: 0.75rem;
+    }
+
+    .tiktok-result a {
+      display: block;
+      padding: 0.65rem;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      text-decoration: none;
+      border-radius: 8px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .tiktok-result a:active {
+      background: var(--accent);
+      color: #000;
+    }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <header class="top-header">
+    <div class="brand">
+      <img src="https://cdn.phototourl.com/member/2026-09-27-bfb1146c-714f-4bca-97ff-7eb50e41818b.jpg" alt="Logo CIVUTAX" class="brand-logo">
+      <span class="brand-name">CIVU<span>TAX</span></span>
+    </div>
+    
+    <button class="hamburger-btn" onclick="toggleMenu()" aria-label="Open Menu">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="22" height="22"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+  </header>
+
+  <div class="menu-overlay" id="menuOverlay" onclick="toggleMenu()"></div>
+
+  <aside class="drawer-menu" id="drawerMenu">
+    <div class="drawer-header">
+      <span class="drawer-title">Pengaturan & Bantuan</span>
+      <button class="close-btn" onclick="toggleMenu()" aria-label="Close Menu">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="22" height="22"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <div class="access-info-box">
+      <div class="access-info-title">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Access Until
+      </div>
+      <span class="access-badge" id="userAccessBadge">User</span>
+    </div>
+
+    <ul class="drawer-list">
+      <li class="drawer-item" id="menuSalesAccess" style="display: none;">
+        <button onclick="accessSales()">
+          <svg fill="none" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          Akses Penjualan
+        </button>
+      </li>
+
+      <li class="drawer-item" id="menuDevAcc" style="display: none;">
+        <a href="admin-acc.html" style="color: #a855f7; font-weight: 800;">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          Panel ACC Akun (Developer)
+        </a>
+      </li>
+
+      <li class="drawer-item">
+        <a href="https://t.me/+IAiZfN1NQrJjZjhl" target="_blank" style="color: #38bdf8; font-weight: 700;">
+          <svg fill="none" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+          Channel Telegram
+        </a>
+      </li>
+
+      <li class="drawer-item up-role-item">
+        <button onclick="upRole()">
+          <svg fill="none" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 11l3-3m0 0l3 3m-3-3v8m0-13a9 9 0 110 18 9 9 0 010-18z"/></svg>
+          Up Role / Upgrade Paket
+        </button>
+      </li>
+      <li class="drawer-item">
+        <button onclick="showInfoApp()">
+          <svg fill="none" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          Info App
+        </button>
+      </li>
+      <li class="drawer-item">
+        <button id="btnUpdateApkDrawer" onclick="checkUpdate()">
+          <svg fill="none" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          Update APK
+        </button>
+      </li>
+      <li class="drawer-item">
+        <button id="btnChangePwdDrawer" onclick="changePassword()">
+          <svg fill="none" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+          Change Password
+        </button>
+      </li>
+      <li class="drawer-item">
+        <a href="https://t.me/ranzz_offc" target="_blank" rel="noopener noreferrer">
+          <svg fill="none" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+          Lapor Masalah ke Tele
+        </a>
+      </li>
+      <li class="drawer-item logout-item" style="margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 0.5rem;">
+        <button type="button" onclick="event.stopPropagation(); logout();">
+          <svg fill="none" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+          Logout
+        </button>
+      </li>
+    </ul>
+  </aside>
+
+  <div class="main-container">
+    
+    <!-- HALAMAN BERANDA -->
+    <div id="sectionBeranda" class="tab-content active">
+      <div class="section-title-top">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="22" height="22"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        Halaman Beranda
+      </div>
+
+      <div class="telegram-card">
+        <div class="telegram-info">
+          <div class="telegram-icon">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="22" height="22"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+          </div>
+          <div class="telegram-text">
+            <h4>Channel Telegram Resmi</h4>
+            <p>Gabung untuk update informasi aplikasi</p>
+          </div>
+        </div>
+        <a href="https://t.me/+IAiZfN1NQrJjZjhl" target="_blank" class="telegram-btn">Join Channel</a>
+      </div>
+
+      <div class="welcome-banner">
+        <img id="userAvatar" src="" alt="Avatar User" class="user-avatar-lg">
+        <div class="welcome-text">
+          <h1 id="welcomeUser">Selamat Datang!</h1>
+        </div>
+      </div>
+
+      <div class="grid-cards">
+        
+        <!-- KARTU 1: SPESIFIKASI AKUN -->
+        <div class="spec-card">
+          <div class="spec-card-header">
+            <div class="spec-header-icon">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="22" height="22">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+              </svg>
+            </div>
+            <h3>Spesifikasi Akun</h3>
+          </div>
+
+          <ul class="spec-list">
+            <li class="spec-item">
+              <div class="spec-item-left">
+                <div class="spec-item-icon" style="color: #38bdf8;">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <span class="spec-label">Username</span>
+              </div>
+              <span class="spec-value" id="userNameValue">-</span>
+            </li>
+
+            <li class="spec-item">
+              <div class="spec-item-left">
+                <div class="spec-item-icon" style="color: #a855f7;">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
+                </div>
+                <span class="spec-label">Role Akun</span>
+              </div>
+              <span class="spec-value" id="userRoleValue" style="color: var(--dev-color);">User</span>
+            </li>
+
+            <li class="spec-item">
+              <div class="spec-item-left">
+                <div class="spec-item-icon" style="color: #22c55e;">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5.636 18.364a9 9 0 010-12.728m12.728 0a9 9 0 010 12.728m-9.9 0a5 5 0 010-7.07m7.072 0a5 5 0 010 7.07M13 12a1 1 0 11-2 0 1 1 0 012 0z"/></svg>
+                </div>
+                <span class="spec-label">User Online</span>
+              </div>
+              <span class="spec-value" id="userOnlineValue" style="color: #22c55e;">● 1 User Login</span>
+            </li>
+
+            <li class="spec-item">
+              <div class="spec-item-left">
+                <div class="spec-item-icon" style="color: #ef4444;">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                </div>
+                <span class="spec-label">Sender WA</span>
+              </div>
+              <span class="spec-value" id="userSenderValue" style="color: #ef4444;">0 Terhubung</span>
+            </li>
+
+            <li class="spec-item">
+              <div class="spec-item-left">
+                <div class="spec-item-icon" style="color: #eab308;">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <span class="spec-label">Masa Berlaku</span>
+              </div>
+              <span class="spec-value" id="userExpValue" style="color: #eab308;">Unlimited / Permanen</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- KARTU 2: STATUS PERANGKAT & BATERAI -->
+        <div class="spec-card">
+          <div class="spec-card-header">
+            <div class="spec-header-icon" style="background: rgba(34, 197, 94, 0.15); color: #22c55e; border-color: rgba(34, 197, 94, 0.3);">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="22" height="22">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3"/>
+              </svg>
+            </div>
+            <h3>Status Perangkat & Baterai</h3>
+          </div>
+
+          <ul class="spec-list">
+            <li class="spec-item">
+              <div class="spec-item-left">
+                <div class="spec-item-icon" style="color: #38bdf8;">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                </div>
+                <span class="spec-label">Device HP</span>
+              </div>
+              <span class="spec-value" id="deviceInfoText" style="color: var(--accent);">Mendeteksi...</span>
+            </li>
+
+            <li class="spec-item">
+              <div class="spec-item-left">
+                <div class="spec-item-icon" style="color: #22c55e;">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>
+                </div>
+                <span class="spec-label">Baterai HP</span>
+              </div>
+              <span class="spec-value" id="batteryLevelText" style="color: #22c55e;">--%</span>
+            </li>
+
+            <li class="spec-item">
+              <div class="spec-item-left">
+                <div class="spec-item-icon" style="color: #38bdf8;">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                </div>
+                <span class="spec-label">Status Daya</span>
+              </div>
+              <span class="spec-value" id="batteryStatusText">--</span>
+            </li>
+
+            <li class="spec-item">
+              <div class="spec-item-left">
+                <div class="spec-item-icon" style="color: #eab308;">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                </div>
+                <span class="spec-label">Status Lokasi</span>
+              </div>
+              <span class="spec-value" id="locationStatus" style="color: #eab308;">Belum Disetujui</span>
+            </li>
+
+            <li class="spec-item">
+              <div class="spec-item-left">
+                <div class="spec-item-icon" style="color: #a855f7;">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18zM12 6v6l4 2"/></svg>
+                </div>
+                <span class="spec-label">Zona Waktu</span>
+              </div>
+              <span class="spec-value" id="userTimezone">Lokal Sistem</span>
+            </li>
+
+            <li class="spec-item">
+              <div class="spec-item-left">
+                <div class="spec-item-icon" style="color: var(--accent);">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <span class="spec-label">Waktu Sistem</span>
+              </div>
+              <span class="spec-value" id="liveClock" style="color: var(--accent);">--:--:--</span>
+            </li>
+          </ul>
+
+          <button class="location-btn" id="btnRequestLocation" onclick="requestUserLocation()">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            Setujui Lokasi Saya
+          </button>
+        </div>
+
+      </div>
+
+      <div class="card chat-card-wrapper" id="globalChatCard">
+        <div class="card-header-flex">
+          <h3>
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="20" height="20"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+            Chat Global CIVUTAX
+          </h3>
+          <button id="btnClearDevChat" class="dev-clear-chat-btn" onclick="clearAllChatsByDev()">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            Bersihkan Chat
+          </button>
+        </div>
+
+        <div id="chatMessages" class="chat-messages">
+          <div style="color: var(--text-muted); font-size: 0.85rem; text-align: center; margin: auto;">Memuat percakapan...</div>
+        </div>
+
+        <div id="replyPreview" class="reply-preview-box">
+          <div class="reply-info" id="replyInfoText">Membalas <strong>@user</strong>: "..."</div>
+          <button class="close-reply-btn" onclick="cancelReply()">✕</button>
+        </div>
+
+        <form id="chatForm" class="chat-input-group">
+          <input type="text" id="chatInput" placeholder="Ketik pesan (Tap pesan mana saja untuk membalas)..." required autocomplete="off">
+          <button type="submit" id="btnSendChat">Kirim</button>
+        </form>
+      </div>
+
+    </div>
+
+    <!-- HALAMAN AKSES PENJUALAN -->
+    <div id="sectionPenjualan" class="tab-content">
+      <div class="section-title-top">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="22" height="22"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        Panel Akses Penjualan
+      </div>
+
+      <nav class="sales-subnav">
+        <button class="sales-subtab-btn active" id="btnSubTabCreate" onclick="switchSalesSubTab('create')">
+          <span>➕ Buat Akun</span>
+        </button>
+        <button class="sales-subtab-btn" id="btnSubTabHistory" onclick="switchSalesSubTab('history')">
+          <span>📋 History Penjualan</span>
+        </button>
+        <button class="sales-subtab-btn" id="btnSubTabIncome" onclick="switchSalesSubTab('income')">
+          <span>💰 Nominal ACC</span>
+        </button>
+      </nav>
+
+      <div id="salesSubContentCreate" class="sales-subcontent active">
+        <div class="card">
+          <h3>
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="20" height="20"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+            Formulir Otorisasi / Buat Akun Pembeli
+          </h3>
+          
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin-top:0.4rem; margin-bottom: 0.75rem;">Daftar Harga Resmi Per Akun / Role Paket:</p>
+          <div class="price-grid">
+            <div class="price-item"><div class="title">Harian</div><div class="cost">Rp2.000 / hari</div></div>
+            <div class="price-item"><div class="title">Mingguan</div><div class="cost">Rp7.000</div></div>
+            <div class="price-item"><div class="title">Bulanan</div><div class="cost">Rp15.000</div></div>
+            <div class="price-item"><div class="title">Role Full Up</div><div class="cost">Rp30.000</div></div>
+            <div class="price-item"><div class="title">Role Reseller</div><div class="cost">Rp50.000</div></div>
+            <div class="price-item"><div class="title">Role Partner</div><div class="cost">Rp70.000</div></div>
+            <div class="price-item" style="grid-column: span 2;"><div class="title">Role Owner (Own)</div><div class="cost">Rp90.000</div></div>
+          </div>
+
+          <div style="border-top: 1px solid var(--border-color); padding-top: 1rem;">
+            <div class="form-group-sale">
+              <label for="salePackage">Pilih Paket / Role Akun:</label>
+              <select id="salePackage" onchange="toggleDailyDaysInput(); calculateSalesTax();">
+                <option value="2000" data-name="Harian">Harian (Rp2.000 / hari)</option>
+                <option value="7000" data-name="Mingguan">Mingguan - Rp7.000</option>
+                <option value="15000" data-name="Bulanan">Bulanan - Rp15.000</option>
+                <option value="30000" data-name="Full Up">Full Up - Rp30.000</option>
+                <option value="50000" data-name="Reseller">Reseller - Rp50.000</option>
+                <option value="70000" data-name="Partner">Partner - Rp70.000</option>
+                <option value="90000" data-name="Owner">Owner (Own) - Rp90.000</option>
+              </select>
+            </div>
+
+            <div class="form-group-sale" id="dailyDaysWrapper" style="display: block;">
+              <label for="dailyDaysCount">Jumlah Hari (Mentok 5 Hari):</label>
+              <select id="dailyDaysCount" onchange="calculateSalesTax()">
+                <option value="1">1 Hari - Rp2.000</option>
+                <option value="2">2 Hari - Rp4.000</option>
+                <option value="3">3 Hari - Rp6.000</option>
+                <option value="4">4 Hari - Rp8.000</option>
+                <option value="5">5 Hari - Rp10.000</option>
+              </select>
+            </div>
+
+            <div class="form-group-sale">
+              <label for="buyerUsername">Username Pembeli:</label>
+              <input type="text" id="buyerUsername" placeholder="Masukkan username pembeli" oninput="checkDuplicateUsername()">
+              <div id="usernameStatus" class="username-status-msg"></div>
+            </div>
+
+            <div class="form-group-sale">
+              <label for="buyerPassword">Kata Sandi / Password Akun Pembeli:</label>
+              <div class="password-input-wrapper">
+                <input type="password" id="buyerPassword" placeholder="Masukkan kata sandi baru">
+                <button type="button" class="toggle-pwd-btn" onclick="togglePasswordVisibility('buyerPassword', 'pwdEyeIcon')">
+                  <svg id="pwdEyeIcon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="20" height="20"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <div id="taxInfoBox" class="tax-box">
+              <strong>Rincian Pembayaran:</strong><br>
+              • Harga Paket: <span id="txtPackageCost">Rp2.000</span><br>
+              • Pajak Pembuatan (10%): <span id="txtTaxAmount">Rp200</span><br>
+              <small style="display:block; margin-top:0.4rem; color:#fef08a;">*Data akun dikirim ke Antrean ACC Developer Ranzz sebelum resmi aktif!</small>
+            </div>
+
+            <button class="action-btn" id="btnSubmitSale" onclick="submitSalesOrder()" style="margin-top: 1rem; background: #10b981; color: #fff; border: none;">
+              💾 Simpan Ke Database & Lapor Admin
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="salesSubContentHistory" class="sales-subcontent">
+        <div class="card">
+          <div class="card-header-flex">
+            <h3>
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="20" height="20"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              Riwayat Pengajuan Akun
+            </h3>
+            <button onclick="loadSalesData()" style="background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.8rem; font-weight: 700;">
+              🔄 Refresh Data
+            </button>
+          </div>
+
+          <div id="salesHistoryContainer" class="history-list">
+            <div style="color: var(--text-muted); font-size: 0.85rem; text-align: center; margin: 1rem 0;">Memuat riwayat penjualan...</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="salesSubContentIncome" class="sales-subcontent">
+        <div class="summary-total-card">
+          <div class="title">Total Nominal Penjualan ACC / Disetujui</div>
+          <div class="amount" id="totalApprovedIncomeText">Rp0</div>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">
+            Total gabungan dari harga paket & pajak akun yang disetujui (Approved)
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header-flex">
+            <h3>
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="20" height="20"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              Rincian Transaksi Berhasil (ACC)
+            </h3>
+            <button onclick="loadSalesData()" style="background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.8rem; font-weight: 700;">
+              🔄 Refresh
+            </button>
+          </div>
+
+          <div id="approvedSalesContainer" class="history-list">
+            <div style="color: var(--text-muted); font-size: 0.85rem; text-align: center; margin: 1rem 0;">Memuat data transaksi ACC...</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- HALAMAN MENU (PAIRING WA VIA TERMUX) -->
+    <div id="sectionMenu" class="tab-content">
+      <div class="section-title-top">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="22" height="22"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+        Daftar Menu Utama
+      </div>
+
+      <div class="card" style="border-color: #facc15; background: linear-gradient(135deg, rgba(234,179,8,0.08), rgba(234,179,8,0.03));">
+        <div style="display:flex; align-items:flex-start; gap:0.85rem;">
+          <div style="font-size:2rem; line-height:1;">📲</div>
+          <div style="flex:1;">
+            <h3 style="color:#facc15; margin:0 0 0.4rem 0;">Pairing WhatsApp via Termux</h3>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom:0.85rem; line-height:1.5;">
+              Untuk menyambungkan WhatsApp ke bot CIVUTAX, Anda <strong style="color:#facc15;">WAJIB pakai Termux sendiri</strong> di HP Anda. Setiap pengguna harus menjalankan script sendiri di Termux-nya.
+            </p>
+            <button onclick="openTermuxGuide()" style="background: #0284c7; color: #fff; border:none; padding: 0.55rem 1rem; border-radius: 8px; font-weight: 700; font-size: 0.82rem; cursor:pointer;">
+              📖 Buka Panduan Lengkap
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="waVerifyCard">
+        <h3>
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="20" height="20"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          Verifikasi Token Pairing
+        </h3>
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.4rem; margin-bottom: 1rem;">
+          Setelah Anda selesai pairing di Termux, copy token 32 karakter yang muncul, lalu paste di sini.
+        </p>
+
+        <div id="waConnectedInfo" style="display:none; padding: 1rem; background: rgba(34,197,94,0.1); border: 1px solid #22c55e; border-radius: 10px; margin-bottom: 1rem;">
+          <div style="font-size: 0.9rem; color: #86efac; font-weight: 800; display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="20" height="20"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            WhatsApp Tersambung via Termux
+          </div>
+          <div style="font-size: 0.85rem; color: var(--text-muted);">
+            Nomor: <strong id="waConnectedNumber" style="color: var(--accent);">-</strong><br>
+            Tersambung sejak: <strong id="waConnectedAt" style="color: var(--text-muted);">-</strong>
+          </div>
+          <button onclick="disconnectWaDevice()" style="margin-top: 0.85rem; background: rgba(239,68,68,0.15); border: 1px solid #ef4444; color: #ef4444; padding: 0.55rem 1rem; border-radius: 8px; font-size: 0.82rem; font-weight: 700; cursor: pointer;">
+            ⛔ Putuskan Perangkat
+          </button>
+        </div>
+
+        <div id="waTokenForm">
+          <div class="form-group-sale">
+            <label for="waPairingToken">Token Pairing (32 karakter):</label>
+            <input 
+              type="text" 
+              id="waPairingToken" 
+              placeholder="Paste token dari Termux di sini..." 
+              maxlength="32"
+              autocomplete="off"
+              spellcheck="false"
+              style="font-family: monospace; letter-spacing: 1px; font-size: 0.9rem;"
+              oninput="handleTokenInput()"
+            >
+            <div id="waTokenStatus" style="font-size: 0.78rem; margin-top: 0.35rem; font-weight: 600; display: none;"></div>
+          </div>
+
+          <button class="action-btn" id="btnVerifyToken" onclick="verifyPairingToken()" disabled style="background:#334155; color:#94a3b8; border:none; cursor:not-allowed;">
+            🔓 Verifikasi & Aktifkan WhatsApp
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- HALAMAN TOOLS -->
+    <div id="sectionTools" class="tab-content">
+      <div class="section-title-top">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="22" height="22"><path stroke-linecap="round" stroke-linejoin="round" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"/></svg>
+        Alat & Utilitas
+      </div>
+
+      <div class="tools-grid">
+
+        <div class="tool-card" onclick="openToolModal('tiktok')">
+          <div class="tool-icon" style="background: linear-gradient(135deg, #ff0050, #00f2ea);">
+            <svg fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2" width="24" height="24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
+          </div>
+          <div class="tool-info">
+            <h4>Download TikTok</h4>
+            <p>Unduh video TikTok tanpa watermark (MP4/MP3)</p>
+          </div>
+        </div>
+
+        <div class="tool-card" onclick="openToolModal('shortlink')">
+          <div class="tool-icon" style="background: linear-gradient(135deg, #38bdf8, #0284c7);">
+            <svg fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2" width="24" height="24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+          </div>
+          <div class="tool-info">
+            <h4>Shortlink Generator</h4>
+            <p>Pendekkan link panjang jadi lebih rapi</p>
+          </div>
+        </div>
+
+        <div class="tool-card" onclick="openToolModal('qrcode')">
+          <div class="tool-icon" style="background: linear-gradient(135deg, #a855f7, #7e22ce);">
+            <svg fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2" width="24" height="24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+          </div>
+          <div class="tool-info">
+            <h4>QR Code Maker</h4>
+            <p>Buat QR Code dari teks/link apapun</p>
+          </div>
+        </div>
+
+        <div class="tool-card" onclick="openToolModal('calc')">
+          <div class="tool-icon" style="background: linear-gradient(135deg, #22c55e, #16a34a);">
+            <svg fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2" width="24" height="24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m-6 4h6m-6 4h3M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"/></svg>
+          </div>
+          <div class="tool-info">
+            <h4>Kalkulator</h4>
+            <p>Hitung cepat operasi matematika dasar</p>
+          </div>
+        </div>
+
+        <div class="tool-card" onclick="openToolModal('base64')">
+          <div class="tool-icon" style="background: linear-gradient(135deg, #eab308, #ca8a04);">
+            <svg fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2" width="24" height="24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+          </div>
+          <div class="tool-info">
+            <h4>Base64 Encode/Decode</h4>
+            <p>Konversi teks ke Base64 & sebaliknya</p>
+          </div>
+        </div>
+
+        <div class="tool-card" onclick="openToolModal('pwdgen')">
+          <div class="tool-icon" style="background: linear-gradient(135deg, #ef4444, #dc2626);">
+            <svg fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2" width="24" height="24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+          </div>
+          <div class="tool-info">
+            <h4>Password Generator</h4>
+            <p>Buat password kuat & random</p>
+          </div>
+        </div>
+
+        <div class="tool-card" onclick="openToolModal('currency')">
+          <div class="tool-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
+            <svg fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2" width="24" height="24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <div class="tool-info">
+            <h4>Konversi Mata Uang</h4>
+            <p>Kurs real-time (USD, IDR, MYR, dll)</p>
+          </div>
+        </div>
+
+        <div class="tool-card" onclick="openToolModal('texttools')">
+          <div class="tool-icon" style="background: linear-gradient(135deg, #f97316, #ea580c);">
+            <svg fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2" width="24" height="24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16m-7 6h7"/></svg>
+          </div>
+          <div class="tool-info">
+            <h4>Text Tools</h4>
+            <p>UPPER, lower, Title, Reverse, Hitung karakter</p>
+          </div>
+        </div>
+
+                <!-- 9. UPLOAD FOTO TO URL -->
+        <div class="tool-card" onclick="openToolModal('uploadimage')">
+          <div class="tool-icon" style="background: linear-gradient(135deg, #06b6d4, #0891b2);">
+            <svg fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2" width="24" height="24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          </div>
+          <div class="tool-info">
+            <h4>Upload Foto → URL</h4>
+            <p>Upload gambar & dapat link URL langsung</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MODAL UBAH PASSWORD -->
+  <div id="modalChangePassword" class="modal-pwd-container">
+    <div class="card modal-pwd-content">
+      <div class="card-header-flex">
+        <h3>
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="20" height="20"><path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+          Ubah Kata Sandi Akun
+        </h3>
+        <button class="close-btn" onclick="closeChangePasswordModal()">✕</button>
+      </div>
+      
+      <div class="form-group-sale">
+        <label for="targetUsernameInput">Username Akun Target:</label>
+        <input type="text" id="targetUsernameInput" placeholder="Masukkan username akun yang ingin diubah">
+      </div>
+
+      <div class="form-group-sale">
+        <label for="oldPasswordInput">Password Saat Ini (Lama):</label>
+        <div class="password-input-wrapper">
+          <input type="password" id="oldPasswordInput" placeholder="Masukkan password lama">
+          <button type="button" class="toggle-pwd-btn" onclick="togglePasswordVisibility('oldPasswordInput', 'oldPwdEyeIcon')">
+            <svg id="oldPwdEyeIcon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="20" height="20"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="form-group-sale">
+        <label for="newPasswordInput">Password Baru:</label>
+        <div class="password-input-wrapper">
+          <input type="password" id="newPasswordInput" placeholder="Masukkan password baru">
+          <button type="button" class="toggle-pwd-btn" onclick="togglePasswordVisibility('newPasswordInput', 'newPwdEyeIcon')">
+            <svg id="newPwdEyeIcon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="20" height="20"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <button class="action-btn" id="btnSubmitChangePwd" onclick="submitChangePassword()" style="background: var(--accent); color: #000; margin-top: 0.5rem;">
+        💾 Simpan Password Baru
+      </button>
+    </div>
+  </div>
+
+  <!-- TOOL MODAL -->
+  <div id="toolModal" class="tool-modal" onclick="if(event.target===this) closeToolModal();">
+    <div class="tool-modal-content" id="toolModalContent"></div>
+  </div>
+
+  <nav class="bottom-nav">
+    <button class="bottom-nav-item active" onclick="switchNav('beranda', this)">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+      <span>Beranda</span>
+    </button>
+
+    <button class="bottom-nav-item" onclick="switchNav('menu', this)">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+      <span>Menu</span>
+    </button>
+
+    <button class="bottom-nav-item" onclick="switchNav('tools', this)">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"/></svg>
+      <span>Tools</span>
+    </button>
+
+    <button class="bottom-nav-item" onclick="toggleTheme()">
+      <svg id="themeIcon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+      <span>Tema</span>
+    </button>
+  </nav>
+
+  <script>
+    const API_BASE_URL = 'https://civutax-s9zn.vercel.app';
+    const DOWNLOAD_APK_URL = 'https://www.webintoapp.com/download/zip/1659586/civutax%201.0.zip?JiT7rojBmp9g'; 
+
+    let isUsernameTaken = false;
+    let isSendingChat = false;
+    let selectedReply = null;
+    let chatMessagesList = [];
+    let chatIntervalTimer = null;
+    let tokenValid = false;
+
+    function getCurrentSession() {
+      return JSON.parse(localStorage.getItem('user_session')) || null;
+    }
+
+    let userSession = getCurrentSession();
+
+    if (!userSession) {
+      alert('Lu belum login, bro! Silakan login dulu.');
+      window.location.href = 'index.html';
+    } else {
+      initDashboardView();
+    }
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function formatExpDate(createdDateStr, roleName) {
+      const lowerRole = String(roleName || '').toLowerCase();
+      
+      const permanentRoles = ['full up', 'reseller', 'partner', 'owner', 'own', 'ranzz : developer'];
+      if (permanentRoles.some(r => lowerRole.includes(r))) {
+        return "Unlimited / Permanen";
+      }
+
+      let baseDate = new Date();
+      if (createdDateStr) {
+        const parsed = new Date(createdDateStr);
+        if (!isNaN(parsed.getTime())) baseDate = parsed;
+      }
+
+      let expDate = new Date(baseDate.getTime());
+
+      if (lowerRole.includes('harian')) {
+        const matchDays = lowerRole.match(/\((\d+)\s*hari\)/i);
+        const days = matchDays ? parseInt(matchDays[1]) : 1;
+        expDate.setDate(expDate.getDate() + days);
+      } else if (lowerRole.includes('mingguan')) {
+        expDate.setDate(expDate.getDate() + 7);
+      } else if (lowerRole.includes('bulanan')) {
+        expDate.setMonth(expDate.getMonth() + 1);
+      } else {
+        return "Unlimited / Permanen";
+      }
+
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${pad(expDate.getHours())}:${pad(expDate.getMinutes())} WIB - ${pad(expDate.getDate())}/${pad(expDate.getMonth()+1)}/${expDate.getFullYear()}`;
+    }
+
+    function initDashboardView() {
+      userSession = getCurrentSession();
+      if (!userSession) return;
+
+      const username = userSession.username || "";
+      let rawRole = userSession.role || "User";
+
+      const isDeveloperRanzz = username.trim().toLowerCase() === 'ranzz';
+      if (isDeveloperRanzz) rawRole = "Ranzz : DEVELOPER";
+
+      const userRoleLower = rawRole.toLowerCase();
+      const connectedSenders = userSession.connected_senders || 0;
+
+      document.getElementById('welcomeUser').textContent = `Selamat Datang, ${username}!`;
+      document.getElementById('userNameValue').textContent = username;
+      document.getElementById('userAvatar').src = userSession.avatar_url || 'https://cdn.phototourl.com/member/2026-09-27-bfb1146c-714f-4bca-97ff-7eb50e41818b.jpg';
+
+      document.getElementById('userRoleValue').textContent = rawRole;
+      document.getElementById('userAccessBadge').textContent = rawRole;
+      document.getElementById('userOnlineValue').textContent = `● ${userSession.online_users || 1} User Login`;
+
+      const senderElement = document.getElementById('userSenderValue');
+      senderElement.textContent = `${connectedSenders} Nomor WA Terhubung`;
+      senderElement.style.color = connectedSenders === 0 ? '#ef4444' : '#22c55e';
+
+      document.getElementById('userExpValue').textContent = formatExpDate(userSession.created_at, rawRole);
+
+      const allowedSalesRoles = ['reseller', 'partner', 'owner', 'own', 'ranzz : developer'];
+      const isSalesAllowed = allowedSalesRoles.some(r => userRoleLower.includes(r));
+
+      if (isSalesAllowed) {
+        document.getElementById('menuSalesAccess').style.display = 'block';
+      }
+
+      if (isDeveloperRanzz) {
+        const devAccMenu = document.getElementById('menuDevAcc');
+        if (devAccMenu) devAccMenu.style.display = 'block';
+
+        const btnClearDev = document.getElementById('btnClearDevChat');
+        if (btnClearDev) btnClearDev.style.display = 'inline-flex';
+      }
+    }
+
+    function detectDevice() {
+      const ua = navigator.userAgent;
+      let deviceName = "Perangkat PC/Laptop";
+      if (/android/i.test(ua)) deviceName = "Android HP";
+      else if (/iPhone|iPad|iPod/i.test(ua)) deviceName = "iOS (iPhone/iPad)";
+
+      const deviceEl = document.getElementById('deviceInfoText');
+      if (deviceEl) deviceEl.textContent = deviceName;
+    }
+
+    function initBatteryStatus() {
+      const levelEl = document.getElementById('batteryLevelText');
+      const statusEl = document.getElementById('batteryStatusText');
+
+      if ('getBattery' in navigator) {
+        navigator.getBattery().then(battery => {
+          function updateAllBatteryInfo() {
+            const level = Math.round(battery.level * 100);
+            if (levelEl) {
+              levelEl.textContent = `${level}%`;
+              levelEl.style.color = level <= 20 ? '#ef4444' : '#22c55e';
+            }
+            if (statusEl) {
+              statusEl.textContent = battery.charging ? "⚡ Mengisi Daya" : "🔋 Discharging";
+              statusEl.style.color = battery.charging ? "#38bdf8" : "var(--text-main)";
+            }
+          }
+          updateAllBatteryInfo();
+          battery.addEventListener('levelchange', updateAllBatteryInfo);
+          battery.addEventListener('chargingchange', updateAllBatteryInfo);
+        });
+      } else {
+        if (levelEl) levelEl.textContent = "Tidak Didukung";
+        if (statusEl) statusEl.textContent = "N/A";
+      }
+    }
+
+    function updateClock() {
+      const now = new Date();
+      const timeString = now.toLocaleTimeString('id-ID', { hour12: false });
+      const clockEl = document.getElementById('liveClock');
+      if (clockEl) clockEl.textContent = timeString;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    function requestUserLocation() {
+      if (!("geolocation" in navigator)) {
+        alert('Browser/WebView kamu tidak mendukung akses lokasi/GPS.');
+        return;
+      }
+
+      const statusEl = document.getElementById('locationStatus');
+      const timeZoneEl = document.getElementById('userTimezone');
+      const btn = document.getElementById('btnRequestLocation');
+
+      if (statusEl) {
+        statusEl.textContent = "Mendeteksi Lokasi...";
+        statusEl.style.color = "#38bdf8";
+      }
+
+      const options = { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 };
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const detectedTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Jakarta';
+
+          if (statusEl) {
+            statusEl.textContent = "● Disetujui (Aktif)";
+            statusEl.style.color = "#22c55e";
+          }
+          if (timeZoneEl) timeZoneEl.textContent = detectedTz;
+
+          if (btn) {
+            btn.textContent = "✓ Lokasi Telah Disetujui";
+            btn.style.background = "rgba(34, 197, 94, 0.15)";
+            btn.style.borderColor = "#22c55e";
+            btn.style.color = "#22c55e";
+            btn.disabled = true;
+          }
+
+          localStorage.setItem('user_location_approved', JSON.stringify({ 
+            lat: position.coords.latitude, 
+            lng: position.coords.longitude, 
+            timezone: detectedTz 
+          }));
+        },
+        (error) => {
+          console.error("Gagal lokasi:", error.message);
+          if (statusEl) {
+            statusEl.textContent = "Akses Ditolak";
+            statusEl.style.color = "#ef4444";
+          }
+          alert('Gagal mendapatkan lokasi. Pastikan GPS HP diaktifkan.');
+        },
+        options
+      );
+    }
+
+    function switchSalesSubTab(subTabName) {
+      const btns = document.querySelectorAll('.sales-subtab-btn');
+      const contents = document.querySelectorAll('.sales-subcontent');
+
+      btns.forEach(b => b.classList.remove('active'));
+      contents.forEach(c => c.classList.remove('active'));
+
+      if (subTabName === 'create') {
+        document.getElementById('btnSubTabCreate').classList.add('active');
+        document.getElementById('salesSubContentCreate').classList.add('active');
+      } else if (subTabName === 'history') {
+        document.getElementById('btnSubTabHistory').classList.add('active');
+        document.getElementById('salesSubContentHistory').classList.add('active');
+        loadSalesData();
+      } else if (subTabName === 'income') {
+        document.getElementById('btnSubTabIncome').classList.add('active');
+        document.getElementById('salesSubContentIncome').classList.add('active');
+        loadSalesData();
+      }
+    }
+
+    function openTermuxGuide() {
+      const guideText = `
+📲 PANDUAN PAIRING WHATSAPP VIA TERMUX
+════════════════════════════════════
+
+1️⃣ INSTALL TERMUX (dari F-Droid, bukan Play Store)
+
+2️⃣ Install dependensi di Termux:
+   pkg update && pkg upgrade -y
+   pkg install nodejs-lts -y
+   npm install -g @whiskeysockets/baileys pino
+
+3️⃣ Buat folder & script:
+   mkdir -p ~/civutax && cd ~/civutax
+   nano civutax-pair.js
+   [paste script dari developer Ranzz, CTRL+O, ENTER, CTRL+X]
+
+4️⃣ Jalankan:
+   node civutax-pair.js
+
+5️⃣ Ikuti instruksi di Termux:
+   • Masukkan username CIVUTAX Anda
+   • Masukkan nomor WhatsApp (contoh: 08123456789)
+   • Tunggu kode 8 digit muncul di Termux
+   • Cek WA → Setelan → Perangkat Tertaut → Tautkan
+   • Masukkan kode dari Termux
+
+6️⃣ Setelah tersambung, akan muncul TOKEN 32 karakter
+   Copy token itu, lalu paste di kolom "Verifikasi Token" di dashboard ini
+
+⚠️ CATATAN:
+• Jangan tutup Termux kalau mau bot tetap aktif
+• Matikan battery optimization untuk Termux
+• Session tersimpan di folder civutax-session/
+      `.trim();
+
+      alert(guideText);
+
+      if (confirm('Mau buka Telegram Developer Ranzz untuk minta script civutax-pair.js?')) {
+        window.open('https://t.me/ranzz_offc', '_blank');
+      }
+    }
+
+    function handleTokenInput() {
+      const input = document.getElementById('waPairingToken');
+      const statusEl = document.getElementById('waTokenStatus');
+      const btn = document.getElementById('btnVerifyToken');
+
+      let token = input.value.replace(/[^a-fA-F0-9]/g, '').slice(0, 32).toLowerCase();
+      input.value = token;
+
+      tokenValid = false;
+      statusEl.style.display = 'none';
+
+      if (!token) {
+        btn.disabled = true;
+        btn.style.background = '#334155';
+        btn.style.color = '#94a3b8';
+        btn.style.cursor = 'not-allowed';
+        return;
+      }
+
+      if (token.length < 32) {
+        statusEl.style.display = 'block';
+        statusEl.style.color = '#eab308';
+        statusEl.textContent = `⚠️ Token ${token.length}/32 karakter.`;
+        btn.disabled = true;
+        btn.style.background = '#334155';
+        btn.style.color = '#94a3b8';
+        btn.style.cursor = 'not-allowed';
+        return;
+      }
+
+      tokenValid = true;
+      statusEl.style.display = 'block';
+      statusEl.style.color = '#22c55e';
+      statusEl.textContent = '✓ Format token valid! Siap diverifikasi.';
+      btn.disabled = false;
+      btn.style.background = '#0284c7';
+      btn.style.color = '#fff';
+      btn.style.cursor = 'pointer';
+    }
+
+    async function verifyPairingToken() {
+      if (!tokenValid) return;
+
+      const token = document.getElementById('waPairingToken').value.trim();
+      const activeSession = getCurrentSession();
+      const btn = document.getElementById('btnVerifyToken');
+
+      if (!activeSession) {
+        alert('❌ Sesi login hilang, silakan login ulang.');
+        window.location.href = 'index.html';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = '⏳ Memverifikasi token...';
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/whatsapp/verify-pairing`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: activeSession.username,
+            pairing_token: token
+          })
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          activeSession.connected_senders = (activeSession.connected_senders || 0) + 1;
+          activeSession.wa_number = data.phone_number;
+          activeSession.wa_paired_at = data.paired_at || new Date().toISOString();
+          activeSession.pairing_token = token;
+          localStorage.setItem('user_session', JSON.stringify(activeSession));
+
+          localStorage.setItem('wa_device_info', JSON.stringify({
+            number: data.phone_number,
+            paired_at: data.paired_at || new Date().toISOString(),
+            token: token,
+            status: 'connected'
+          }));
+
+          const senderEl = document.getElementById('userSenderValue');
+          if (senderEl) {
+            senderEl.textContent = `${activeSession.connected_senders} Nomor WA Terhubung`;
+            senderEl.style.color = '#22c55e';
+          }
+
+          alert('✅ WhatsApp berhasil diverifikasi & aktif!\n\nNomor: +' + data.phone_number);
+          renderWaConnectedInfo();
+        } else {
+          alert('❌ Verifikasi gagal: ' + (data.message || 'Token tidak valid atau sudah expired.'));
+          btn.disabled = false;
+          btn.textContent = '🔓 Verifikasi & Aktifkan WhatsApp';
+        }
+      } catch (err) {
+        console.error('Verify token error:', err);
+        alert('❌ Gagal terhubung ke server: ' + err.message);
+        btn.disabled = false;
+        btn.textContent = '🔓 Verifikasi & Aktifkan WhatsApp';
+      }
+    }
+
+    function renderWaConnectedInfo() {
+      const infoBox = document.getElementById('waConnectedInfo');
+      const numberEl = document.getElementById('waConnectedNumber');
+      const atEl = document.getElementById('waConnectedAt');
+      const form = document.getElementById('waTokenForm');
+
+      const savedDevice = JSON.parse(localStorage.getItem('wa_device_info') || 'null');
+
+      if (savedDevice && savedDevice.number) {
+        infoBox.style.display = 'block';
+        numberEl.textContent = '+' + savedDevice.number;
+        if (atEl) {
+          const d = new Date(savedDevice.paired_at);
+          atEl.textContent = d.toLocaleString('id-ID');
+        }
+        if (form) form.style.display = 'none';
+      } else {
+        infoBox.style.display = 'none';
+        if (form) form.style.display = 'block';
+      }
+    }
+
+    async function disconnectWaDevice() {
+      if (!confirm('⚠️ Yakin ingin memutuskan perangkat WhatsApp?\n\nPastikan Anda sudah stop script di Termux sebelum memutuskan.')) return;
+
+      const activeSession = getCurrentSession();
+      if (!activeSession) return;
+
+      try {
+        await fetch(`${API_BASE_URL}/api/whatsapp/unpair`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: activeSession.username })
+        });
+      } catch (e) {
+        console.error('Unpair error:', e);
+      }
+
+      activeSession.connected_senders = Math.max(0, (activeSession.connected_senders || 1) - 1);
+      activeSession.wa_number = null;
+      activeSession.pairing_token = null;
+      localStorage.setItem('user_session', JSON.stringify(activeSession));
+
+      const senderEl = document.getElementById('userSenderValue');
+      if (senderEl) {
+        senderEl.textContent = `${activeSession.connected_senders} Nomor WA Terhubung`;
+        senderEl.style.color = activeSession.connected_senders === 0 ? '#ef4444' : '#22c55e';
+      }
+
+      localStorage.removeItem('wa_device_info');
+      document.getElementById('waPairingToken').value = '';
+      document.getElementById('waTokenStatus').style.display = 'none';
+      tokenValid = false;
+      renderWaConnectedInfo();
+      alert('⛔ Perangkat WhatsApp berhasil diputuskan.\n\nJangan lupa stop script Termux Anda juga.');
+    }
+
+    let checkTimeout = null;
+    async function checkDuplicateUsername() {
+      const usernameInput = document.getElementById('buyerUsername').value.trim();
+      const statusMsg = document.getElementById('usernameStatus');
+      const btnSubmit = document.getElementById('btnSubmitSale');
+
+      if (!usernameInput) {
+        statusMsg.style.display = 'none';
+        isUsernameTaken = false;
+        btnSubmit.disabled = false;
+        return;
+      }
+
+      clearTimeout(checkTimeout);
+      checkTimeout = setTimeout(async () => {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/users/check-username?username=${encodeURIComponent(usernameInput)}`);
+          const data = await res.json();
+
+          if (data.exists) {
+            isUsernameTaken = true;
+            statusMsg.style.display = 'block';
+            statusMsg.style.color = '#ef4444';
+            statusMsg.textContent = '❌ Username sudah terdaftar di database!';
+            btnSubmit.disabled = true;
+          } else {
+            isUsernameTaken = false;
+            statusMsg.style.display = 'block';
+            statusMsg.style.color = '#22c55e';
+            statusMsg.textContent = '✓ Username belum terdaftar (Bisa dipakai)';
+            btnSubmit.disabled = false;
+          }
+        } catch (err) {
+          isUsernameTaken = false;
+          statusMsg.style.display = 'none';
+          btnSubmit.disabled = false;
+        }
+      }, 400);
+    }
+
+    function togglePasswordVisibility(inputId, iconId) {
+      const pwdInput = document.getElementById(inputId);
+      const pwdEyeIcon = document.getElementById(iconId);
+
+      if (!pwdInput || !pwdEyeIcon) return;
+
+      if (pwdInput.type === 'password') {
+        pwdInput.type = 'text';
+        pwdEyeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858-5.908a10.018 10.018 0 014.122-.963c4.478 0 8.268 2.943 9.542 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21M3 3l18 18"/>';
+      } else {
+        pwdInput.type = 'password';
+        pwdEyeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>';
+      }
+    }
+
+    function toggleDailyDaysInput() {
+      const packageSelect = document.getElementById('salePackage');
+      const packageName = packageSelect.options[packageSelect.selectedIndex].getAttribute('data-name');
+      const dailyWrapper = document.getElementById('dailyDaysWrapper');
+
+      if (packageName === 'Harian') dailyWrapper.style.display = 'block';
+      else dailyWrapper.style.display = 'none';
+    }
+
+    function calculateSalesTax() {
+      const packageSelect = document.getElementById('salePackage');
+      const selectedOption = packageSelect.options[packageSelect.selectedIndex];
+      const packageName = selectedOption.getAttribute('data-name');
+      let basePrice = parseInt(packageSelect.value) || 0;
+
+      if (packageName === 'Harian') {
+        const daysCount = parseInt(document.getElementById('dailyDaysCount').value) || 1;
+        basePrice = daysCount * 2000;
+      }
+
+      const activeSession = getCurrentSession();
+      const rawRole = activeSession ? (activeSession.role || "User").toLowerCase() : "user";
+      const taxRoles = ['full up', 'reseller', 'partner', 'owner', 'own', 'ranzz : developer'];
+      const isTaxable = taxRoles.some(r => rawRole.includes(r));
+
+      const taxAmount = isTaxable ? Math.round(basePrice * 0.10) : 0;
+
+      document.getElementById('txtPackageCost').textContent = `Rp${basePrice.toLocaleString('id-ID')}`;
+      document.getElementById('txtTaxAmount').textContent = isTaxable 
+        ? `Rp${taxAmount.toLocaleString('id-ID')} (Pajak 10%)` 
+        : `Rp0 (Bebas Pajak)`;
+    }
+
+    async function submitSalesOrder() {
+      const activeSession = getCurrentSession();
+      if (!activeSession) return;
+
+      const buyerName = document.getElementById('buyerUsername').value.trim();
+      const buyerPassword = document.getElementById('buyerPassword').value.trim();
+      const packageSelect = document.getElementById('salePackage');
+      const packageName = packageSelect.options[packageSelect.selectedIndex].getAttribute('data-name');
+      
+      let packageCost = parseInt(packageSelect.value) || 0;
+      let durationText = packageName;
+
+      if (packageName === 'Harian') {
+        const daysCount = parseInt(document.getElementById('dailyDaysCount').value) || 1;
+        packageCost = daysCount * 2000;
+        durationText = `Harian (${daysCount} Hari)`;
+      }
+
+      if (!buyerName) { alert('Masukkan username pembeli terlebih dahulu!'); return; }
+      if (isUsernameTaken) { alert('❌ Username sudah terpakai di database!'); return; }
+      if (!buyerPassword) { alert('Masukkan kata sandi/password untuk akun pembeli!'); return; }
+
+      const rawRole = (activeSession.role || "User").toLowerCase();
+      const taxRoles = ['full up', 'reseller', 'partner', 'owner', 'own', 'ranzz : developer'];
+      const isTaxable = taxRoles.some(r => rawRole.includes(r));
+      const taxAmount = isTaxable ? Math.round(packageCost * 0.10) : 0;
+
+      const btnSubmit = document.getElementById('btnSubmitSale');
+      btnSubmit.disabled = true;
+      btnSubmit.textContent = '⏳ Mengirim Pengajuan ACC...';
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/sales/request-approval`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            created_by: activeSession.username,
+            creator_role: activeSession.role,
+            buyer_username: buyerName,
+            buyer_password: buyerPassword,
+            package_name: durationText,
+            package_price: packageCost,
+            tax_amount: taxAmount,
+            status: 'pending_approval'
+          })
+        });
+
+        await res.json();
+        alert('⏳ Pengajuan pembuatan akun berhasil dikirim!\nStatus: Menunggu ACC dari Developer Ranzz.');
+
+        document.getElementById('buyerUsername').value = '';
+        document.getElementById('buyerPassword').value = '';
+
+        switchSalesSubTab('history');
+
+        const messageText = `⚡ *PENGAJUAN AKUN BARU (NEED ACC)* ⚡\n\n` +
+          `• *Pembuat (Pemohon)*: ${activeSession.username} (${activeSession.role})\n` +
+          `• *Username Akun*: ${buyerName}\n` +
+          `• *Password Akun*: ${buyerPassword}\n` +
+          `• *Paket*: ${durationText} (Rp${packageCost.toLocaleString('id-ID')})\n` +
+          `• *Pajak Pembuatan (10%)*: Rp${taxAmount.toLocaleString('id-ID')}\n\n` +
+          `Halo Developer Ranzz, mohon konfirmasi & ACC akun pembeli ini agar resmi tersimpan dan aktif!`;
+
+        window.open(`https://t.me/ranzz_offc?text=${encodeURIComponent(messageText)}`, '_blank');
+
+      } catch (err) {
+        console.error("Gagal mengirim pengajuan:", err);
+      } finally {
+        btnSubmit.disabled = false;
+        btnSubmit.textContent = '💾 Simpan Ke Database & Lapor Admin';
+      }
+    }
+
+    async function loadSalesData() {
+      const historyContainer = document.getElementById('salesHistoryContainer');
+      const approvedContainer = document.getElementById('approvedSalesContainer');
+      const incomeText = document.getElementById('totalApprovedIncomeText');
+      const activeSession = getCurrentSession();
+
+      if (!activeSession) return;
+
+      const currentUsername = String(activeSession.username || '').toLowerCase().trim();
+      const isDevRanzz = currentUsername === 'ranzz';
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/sales/pending-list`);
+        const data = await res.json();
+
+        let rawList = [];
+        if (Array.isArray(data)) rawList = data;
+        else if (data && typeof data === 'object') rawList = data.requests || data.data || data.sales || data.list || data.result || [];
+
+        const parsePrice = (val) => {
+          if (typeof val === 'number') return isNaN(val) ? 0 : val;
+          return parseInt(String(val || 0).replace(/\D/g, '')) || 0;
+        };
+
+        const checkIsApproved = (item) => {
+          if (!item) return false;
+          const st = String(item.status || item.acc_status || item.approval || item.state || '').toLowerCase().trim();
+          return st === 'approved' || st === 'acc' || st === 'disetujui' || st === 'success' || st === 'completed' || item.is_approved === true || item.is_approved === 1;
+        };
+
+        const checkIsCreator = (item) => {
+          if (!item) return false;
+          if (isDevRanzz) return true;
+          const creator = String(
+            item.created_by || item.creator || item.created_username || item.username_creator || item.pembuat || item.user || item.username || ''
+          ).toLowerCase().trim();
+          return !creator || creator === currentUsername;
+        };
+
+        const userHistory = rawList.filter(item => checkIsCreator(item));
+
+        if (historyContainer) {
+          if (userHistory.length === 0) {
+            historyContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem; text-align: center; margin: 1rem 0;">Belum ada riwayat pengajuan akun.</div>';
+          } else {
+            historyContainer.innerHTML = userHistory.map(item => {
+              if (!item) return '';
+              const isAcc = checkIsApproved(item);
+              const stLower = String(item.status || item.acc_status || '').toLowerCase().trim();
+              const isReject = stLower === 'rejected' || stLower === 'ditolak';
+
+              let statusBadge = '<span class="status-badge-pending">⏳ MENUNGGU ACC</span>';
+              if (isAcc) statusBadge = '<span class="status-badge-approved">✓ DI-ACC (AKTIF)</span>';
+              else if (isReject) statusBadge = '<span class="status-badge-rejected">✕ DITOLAK</span>';
+
+              const pkgPrice = parsePrice(item.package_price || item.price || item.harga || item.nominal);
+              const taxPrice = parsePrice(item.tax_amount || item.tax || item.pajak);
+              const totalPrice = pkgPrice + taxPrice;
+              const expCalculated = formatExpDate(item.created_at || item.createdAt || item.date, item.package_name || item.package || item.paket);
+
+              const buyerUser = item.buyer_username || item.buyer || item.username_buyer || item.target_user || 'User';
+              const buyerPass = item.buyer_password || item.password || item.password_buyer || '***';
+
+              return `
+                <div class="history-card-item">
+                  <div class="history-header-flex">
+                    <span class="history-buyer">👤 ${escapeHtml(buyerUser)}</span>
+                    ${statusBadge}
+                  </div>
+                  <div style="color: var(--text-muted); margin-bottom: 0.25rem;">Paket / Role: <strong style="color: var(--text-main);">${escapeHtml(item.package_name || item.package || '-')}</strong></div>
+                  <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid var(--accent); padding: 0.5rem; border-radius: 8px; margin: 0.4rem 0;">
+                    <div style="color: var(--text-muted); margin-bottom: 0.15rem;">Username: <strong style="color: var(--accent);">${escapeHtml(buyerUser)}</strong></div>
+                    <div style="color: var(--text-muted);">Password: <code style="color: #34d399; font-size: 0.9rem;">${escapeHtml(buyerPass)}</code></div>
+                  </div>
+                  <div style="color: var(--text-muted); margin-bottom: 0.25rem;">Kadaluwarsa (EXP): <strong style="color: #eab308;">${expCalculated}</strong></div>
+                  <div style="display: flex; justify-content: space-between; margin-top: 0.4rem; border-top: 1px dashed var(--border-color); padding-top: 0.35rem;">
+                    <span style="color: var(--text-muted);">Total Bayar (Paket + Pajak):</span>
+                    <strong style="color: #34d399;">Rp${totalPrice.toLocaleString('id-ID')}</strong>
+                  </div>
+                </div>
+              `;
+            }).join('');
+          }
+        }
+
+        const approvedList = rawList.filter(item => checkIsApproved(item) && checkIsCreator(item));
+        let totalApprovedAmount = 0;
+
+        if (approvedContainer) {
+          if (approvedList.length === 0) {
+            approvedContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem; text-align: center; margin: 1rem 0;">Belum ada transaksi yang disetujui (ACC).</div>';
+            if (incomeText) incomeText.textContent = 'Rp0';
+          } else {
+            approvedContainer.innerHTML = approvedList.map(item => {
+              if (!item) return '';
+              const packageVal = parsePrice(item.package_price || item.price || item.harga || item.nominal);
+              const taxVal = parsePrice(item.tax_amount || item.tax || item.pajak);
+              const totalPrice = packageVal + taxVal;
+
+              totalApprovedAmount += totalPrice;
+
+              const buyerUser = item.buyer_username || item.buyer || item.username_buyer || item.target_user || 'User';
+              const buyerPass = item.buyer_password || item.password || item.password_buyer || '***';
+              const expCalculated = formatExpDate(item.created_at || item.createdAt || item.date, item.package_name || item.package || item.paket);
+
+              return `
+                <div class="history-card-item" style="border-left: 3px solid #22c55e;">
+                  <div class="history-header-flex">
+                    <span class="history-buyer">👤 ${escapeHtml(buyerUser)}</span>
+                    <span class="status-badge-approved">✓ DI-ACC</span>
+                  </div>
+                  <div style="color: var(--text-muted); margin-bottom: 0.25rem;">Paket / Role: <strong style="color: var(--text-main);">${escapeHtml(item.package_name || item.package || '-')}</strong></div>
+                  <div style="background: rgba(34, 197, 94, 0.08); border: 1px solid #22c55e; padding: 0.5rem; border-radius: 8px; margin: 0.4rem 0;">
+                    <div style="color: var(--text-muted); margin-bottom: 0.15rem;">Username: <strong style="color: var(--accent);">${escapeHtml(buyerUser)}</strong></div>
+                    <div style="color: var(--text-muted);">Password: <code style="color: #34d399; font-size: 0.9rem;">${escapeHtml(buyerPass)}</code></div>
+                  </div>
+                  <div style="color: var(--text-muted); margin-bottom: 0.25rem;">Kadaluwarsa (EXP): <strong style="color: #eab308;">${expCalculated}</strong></div>
+                  <div style="display: flex; justify-content: space-between; margin-top: 0.4rem; border-top: 1px dashed var(--border-color); padding-top: 0.35rem;">
+                    <span style="color: var(--text-muted);">Nominal Penjualan + Pajak:</span>
+                    <strong style="color: #34d399;">+ Rp${totalPrice.toLocaleString('id-ID')}</strong>
+                  </div>
+                </div>
+              `;
+            }).join('');
+
+            if (incomeText) {
+              incomeText.textContent = `Rp${totalApprovedAmount.toLocaleString('id-ID')}`;
+            }
+          }
+        }
+
+      } catch (err) {
+        console.error("Sales data error:", err);
+        if (historyContainer) {
+          historyContainer.innerHTML = '<div style="color: #ef4444; font-size: 0.85rem; text-align: center; margin: 1rem 0;">Gagal terhubung ke server database.</div>';
+        }
+      }
+    }
+
+    function loadGlobalChats() {
+      return fetch(`${API_BASE_URL}/api/chat/list`)
+        .then(res => res.json())
+        .then(data => {
+          let list = [];
+          if (Array.isArray(data)) list = data;
+          else if (data && typeof data === 'object') list = data.chats || data.data || data.messages || [];
+
+          chatMessagesList = list;
+          renderGlobalChats();
+        })
+        .catch(err => console.error('Chat load error:', err));
+    }
+
+    function renderGlobalChats() {
+      const container = document.getElementById('chatMessages');
+      if (!container) return;
+
+      if (!chatMessagesList || chatMessagesList.length === 0) {
+        container.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem; text-align: center; margin: auto;">Belum ada pesan. Jadilah yang pertama!</div>';
+        return;
+      }
+
+      container.innerHTML = chatMessagesList.map((msg, idx) => {
+        if (!msg) return '';
+        const username = msg.username || msg.user || 'Anon';
+        const text = msg.message || msg.text || '';
+        const replyTo = msg.reply_to;
+
+        let quoteHtml = '';
+        if (replyTo && (replyTo.username || replyTo.message)) {
+          quoteHtml = `
+            <div class="quoted-chat">
+              <span class="quoted-chat-user">@${escapeHtml(replyTo.username || 'user')}</span>: ${escapeHtml(replyTo.message || '')}
+            </div>`;
+        }
+
+        return `
+          <div class="chat-item" onclick="selectReplyTo(${idx})">
+            ${quoteHtml}
+            <span class="chat-user">${escapeHtml(username)}:</span>
+            <span>${escapeHtml(text)}</span>
+          </div>
+        `;
+      }).join('');
+
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function selectReplyTo(idx) {
+      if (!chatMessagesList[idx]) return;
+      const msg = chatMessagesList[idx];
+      selectedReply = {
+        username: msg.username || msg.user || 'Anon',
+        message: msg.message || msg.text || ''
+      };
+      const previewBox = document.getElementById('replyPreview');
+      const infoText = document.getElementById('replyInfoText');
+      if (previewBox && infoText) {
+        infoText.innerHTML = `Membalas <strong>@${escapeHtml(selectedReply.username)}</strong>: "${escapeHtml(selectedReply.message.substring(0, 40))}..."`;
+        previewBox.style.display = 'flex';
+      }
+    }
+
+    function cancelReply() {
+      selectedReply = null;
+      const previewBox = document.getElementById('replyPreview');
+      if (previewBox) previewBox.style.display = 'none';
+    }
+
+    async function sendGlobalChat(e) {
+      if (e) e.preventDefault();
+      if (isSendingChat) return;
+
+      const activeSession = getCurrentSession();
+      if (!activeSession) return;
+
+      const input = document.getElementById('chatInput');
+      const btnSend = document.getElementById('btnSendChat');
+      if (!input) return;
+
+      const message = input.value.trim();
+      if (!message) return;
+
+      isSendingChat = true;
+      if (btnSend) btnSend.disabled = true;
+
+      const currentReply = selectedReply ? { ...selectedReply } : null;
+      input.value = '';
+      cancelReply();
+
+      try {
+        const payload = {
+          username: activeSession.username,
+          message: message
+        };
+
+        if (currentReply) payload.reply_to = currentReply;
+
+        const res = await fetch(`${API_BASE_URL}/api/chat/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          loadGlobalChats();
+        } else {
+          alert("⚠ Pesan gagal tersimpan di server: " + (data.message || 'Unknown error'));
+        }
+      } catch (err) {
+        console.error("Gagal terhubung ke server:", err);
+      } finally {
+        isSendingChat = false;
+        if (btnSend) btnSend.disabled = false;
+      }
+    }
+
+    function clearAllChatsByDev() {
+      if (!confirm('⚠ Yakin ingin menghapus SEMUA chat global?')) return;
+      fetch(`${API_BASE_URL}/api/chat/clear`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: getCurrentSession()?.username })
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            alert('✓ Chat global berhasil dibersihkan!');
+            loadGlobalChats();
+          } else {
+            alert('Gagal: ' + (data.message || 'Error'));
+          }
+        })
+        .catch(err => console.error('Clear chat error:', err));
+    }
+
+    function toggleMenu() {
+      const drawer = document.getElementById('drawerMenu');
+      const overlay = document.getElementById('menuOverlay');
+      if (drawer) drawer.classList.toggle('active');
+      if (overlay) overlay.classList.toggle('active');
+    }
+
+    function accessSales() {
+      toggleMenu();
+      document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+      document.querySelectorAll('.bottom-nav-item').forEach(b => b.classList.remove('active'));
+      const salesSection = document.getElementById('sectionPenjualan');
+      if (salesSection) {
+        salesSection.classList.add('active');
+        switchSalesSubTab('create');
+        toggleDailyDaysInput();
+        calculateSalesTax();
+      }
+    }
+
+    function upRole() {
+      toggleMenu();
+      const confirmUp = confirm('⚡ Apakah Anda ingin mengajukan Up Role / Upgrade Paket ke Ranzz DEVELOPER?');
+      if (confirmUp) {
+        window.open('https://t.me/ranzz_offc', '_blank');
+      }
+    }
+
+    function showInfoApp() {
+      toggleMenu();
+      alert('Nama Aplikasi: CIVUTAX\nVersi: 1.0.0\nDeveloper: Ranzz DEVELOPER');
+    }
+
+    function checkUpdate() {
+      toggleMenu();
+      const confirmUpdate = confirm('🚀 Apakah Anda ingin mengunduh/memperbarui APK CIVUTAX ke versi terbaru?');
+      if (confirmUpdate) {
+        window.open(DOWNLOAD_APK_URL, '_blank');
+      }
+    }
+
+    function changePassword() {
+      toggleMenu();
+      const modal = document.getElementById('modalChangePassword');
+      const activeSession = getCurrentSession();
+
+      if (modal) {
+        modal.style.display = 'flex';
+        document.getElementById('targetUsernameInput').value = activeSession ? (activeSession.username || '') : '';
+        document.getElementById('oldPasswordInput').value = '';
+        document.getElementById('newPasswordInput').value = '';
+      }
+    }
+
+    function closeChangePasswordModal() {
+      const modal = document.getElementById('modalChangePassword');
+      if (modal) modal.style.display = 'none';
+      document.getElementById('targetUsernameInput').value = '';
+      document.getElementById('oldPasswordInput').value = '';
+      document.getElementById('newPasswordInput').value = '';
+    }
+
+    async function submitChangePassword() {
+      const activeSession = getCurrentSession();
+      const targetUsername = document.getElementById('targetUsernameInput').value.trim();
+      const oldPassword = document.getElementById('oldPasswordInput').value.trim();
+      const newPassword = document.getElementById('newPasswordInput').value.trim();
+      const btnSubmit = document.getElementById('btnSubmitChangePwd');
+
+      if (!targetUsername) { alert('⚠️ Username akun target wajib diisi!'); return; }
+      if (!newPassword) { alert('⚠️ Password baru wajib diisi!'); return; }
+      if (newPassword.length < 3) { alert('⚠️ Password baru minimal 3 karakter!'); return; }
+
+      btnSubmit.disabled = true;
+      btnSubmit.textContent = '⏳ Memperbarui...';
+
+      try {
+        const payload = {
+          username: targetUsername,
+          oldPassword: oldPassword,
+          newPassword: newPassword,
+          requested_by: activeSession ? activeSession.username : targetUsername,
+          requested_role: activeSession ? activeSession.role : 'User'
+        };
+
+        const res = await fetch(`${API_BASE_URL}/api/users/change-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          alert('✅ ' + data.message);
+          
+          if (activeSession && activeSession.username.toLowerCase() === targetUsername.toLowerCase()) {
+            activeSession.password = newPassword;
+            localStorage.setItem('user_session', JSON.stringify(activeSession));
+          }
+
+          closeChangePasswordModal();
+        } else {
+          alert('❌ Gagal: ' + (data.message || 'Respons server tidak valid.'));
+        }
+      } catch (err) {
+        console.error('Change Password Fetch Error:', err);
+      } finally {
+        btnSubmit.disabled = false;
+        btnSubmit.textContent = '💾 Simpan Password Baru';
+      }
+    }
+
+    function switchNav(tabName, btn) {
+      const tabs = document.querySelectorAll('.tab-content');
+      const navBtns = document.querySelectorAll('.bottom-nav-item');
+
+      tabs.forEach(tab => tab.classList.remove('active'));
+      navBtns.forEach(nav => nav.classList.remove('active'));
+
+      if (btn) btn.classList.add('active');
+
+      const targetSectionId = `section${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`;
+      const targetSection = document.getElementById(targetSectionId);
+
+      if (targetSection) {
+        targetSection.classList.add('active');
+        if (tabName === 'penjualan') {
+          switchSalesSubTab('create');
+        }
+      }
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle('light-theme');
+      const themeIcon = document.getElementById('themeIcon');
+      if (!themeIcon) return;
+      
+      if (document.body.classList.contains('light-theme')) {
+        themeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>';
+      } else {
+        themeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>';
+      }
+    }
+
+    function logout() {
+      try {
+        if (chatIntervalTimer) {
+          clearInterval(chatIntervalTimer);
+          chatIntervalTimer = null;
+        }
+        if (typeof cancelReply === 'function') cancelReply();
+
+        const drawer = document.getElementById('drawerMenu');
+        const overlay = document.getElementById('menuOverlay');
+        if (drawer) drawer.classList.remove('active');
+        if (overlay) overlay.classList.remove('active');
+
+        localStorage.removeItem('user_session');
+        window.location.replace('index.html');
+      } catch (err) {
+        console.error('Logout error:', err);
+        localStorage.removeItem('user_session');
+        window.location.replace('index.html');
+      }
+    }
+
+    /* ============================================
+       ===== TOOLS FUNCTIONS =====================
+       ============================================ */
+    const TOOLS_API_BASE = 'https://civutax-s9zn.vercel.app';
+
+    function openToolModal(toolName) {
+      const modal = document.getElementById('toolModal');
+      const content = document.getElementById('toolModalContent');
+      if (!modal || !content) return;
+
+      let html = '';
+
+      if (toolName === 'tiktok') {
+        html = `
+          <div class="tool-modal-header">
+            <h3>📥 Download TikTok</h3>
+            <button class="tool-modal-close" onclick="closeToolModal()">✕</button>
+          </div>
+          <div class="tool-body">
+            <label>Link TikTok:</label>
+            <input type="text" id="ttUrl" placeholder="https://vt.tiktok.com/..." autocomplete="off">
+            <button onclick="downloadTikTok()">🚀 Proses Download</button>
+            <div class="tool-result" id="ttResult"></div>
+            <div class="tiktok-result" id="ttPreview"></div>
+          </div>
+        `;
+      } else if (toolName === 'shortlink') {
+        html = `
+          <div class="tool-modal-header">
+            <h3>🔗 Shortlink Generator</h3>
+            <button class="tool-modal-close" onclick="closeToolModal()">✕</button>
+          </div>
+          <div class="tool-body">
+            <label>Link Panjang:</label>
+            <input type="text" id="slUrl" placeholder="https://example.com/very/long/link" autocomplete="off">
+            <button onclick="generateShortlink()">✂️ Pendekkan</button>
+            <div class="tool-result" id="slResult"></div>
+          </div>
+        `;
+      } else if (toolName === 'qrcode') {
+        html = `
+          <div class="tool-modal-header">
+            <h3>📱 QR Code Maker</h3>
+            <button class="tool-modal-close" onclick="closeToolModal()">✕</button>
+          </div>
+          <div class="tool-body">
+            <label>Teks / Link:</label>
+            <textarea id="qrText" placeholder="Masukkan teks atau link..."></textarea>
+            <button onclick="generateQR()">📸 Generate QR</button>
+            <div id="qrPreview" style="text-align:center; margin-top:1rem;"></div>
+          </div>
+        `;
+      } else if (toolName === 'calc') {
+        html = `
+          <div class="tool-modal-header">
+            <h3>🧮 Kalkulator</h3>
+            <button class="tool-modal-close" onclick="closeToolModal()">✕</button>
+          </div>
+          <div class="tool-body">
+            <label>Ekspresi Matematika:</label>
+            <input type="text" id="calcInput" placeholder="Contoh: (2+3)*4/2" autocomplete="off" style="font-family:'Courier New',monospace;">
+            <button onclick="calcExpression()">= Hitung</button>
+            <div class="tool-result" id="calcResult" style="font-size:1.5rem;text-align:center;color:var(--accent);"></div>
+          </div>
+        `;
+      } else if (toolName === 'base64') {
+        html = `
+          <div class="tool-modal-header">
+            <h3>🔐 Base64 Encode/Decode</h3>
+            <button class="tool-modal-close" onclick="closeToolModal()">✕</button>
+          </div>
+          <div class="tool-body">
+            <label>Teks Input:</label>
+            <textarea id="b64Input" placeholder="Masukkan teks..."></textarea>
+            <button onclick="base64Encode()">🔒 Encode</button>
+            <button class="btn-secondary" onclick="base64Decode()">🔓 Decode</button>
+            <div class="tool-result" id="b64Result"></div>
+          </div>
+        `;
+      } else if (toolName === 'pwdgen') {
+        html = `
+          <div class="tool-modal-header">
+            <h3>🔑 Password Generator</h3>
+            <button class="tool-modal-close" onclick="closeToolModal()">✕</button>
+          </div>
+          <div class="tool-body">
+            <label>Panjang Password: <span id="pwdLenLabel">16</span></label>
+            <input type="range" id="pwdLength" min="6" max="64" value="16" oninput="document.getElementById('pwdLenLabel').textContent=this.value">
+            <label style="margin-top:0.75rem;"><input type="checkbox" id="pwdUpper" checked style="width:auto;display:inline;"> Huruf Besar</label>
+            <label><input type="checkbox" id="pwdLower" checked style="width:auto;display:inline;"> Huruf Kecil</label>
+            <label><input type="checkbox" id="pwdNum" checked style="width:auto;display:inline;"> Angka</label>
+            <label><input type="checkbox" id="pwdSym" checked style="width:auto;display:inline;"> Simbol</label>
+            <button onclick="generatePassword()">🎲 Generate Password</button>
+            <div class="tool-result" id="pwdResult" style="font-size:1.1rem;text-align:center;"></div>
+          </div>
+        `;
+      } else if (toolName === 'currency') {
+        html = `
+          <div class="tool-modal-header">
+            <h3>💱 Konversi Mata Uang</h3>
+            <button class="tool-modal-close" onclick="closeToolModal()">✕</button>
+          </div>
+          <div class="tool-body">
+            <label>Jumlah:</label>
+            <input type="number" id="currAmount" value="100">
+            <label>Dari:</label>
+            <select id="currFrom">
+              <option value="IDR" selected>IDR - Rupiah Indonesia</option>
+              <option value="USD">USD - Dollar AS</option>
+              <option value="EUR">EUR - Euro</option>
+              <option value="MYR">MYR - Ringgit Malaysia</option>
+              <option value="SGD">SGD - Dollar Singapura</option>
+              <option value="JPY">JPY - Yen Jepang</option>
+              <option value="GBP">GBP - Poundsterling</option>
+              <option value="CNY">CNY - Yuan China</option>
+            </select>
+            <label>Ke:</label>
+            <select id="currTo">
+              <option value="USD" selected>USD - Dollar AS</option>
+              <option value="IDR">IDR - Rupiah Indonesia</option>
+              <option value="EUR">EUR - Euro</option>
+              <option value="MYR">MYR - Ringgit Malaysia</option>
+              <option value="SGD">SGD - Dollar Singapura</option>
+              <option value="JPY">JPY - Yen Jepang</option>
+              <option value="GBP">GBP - Poundsterling</option>
+              <option value="CNY">CNY - Yuan China</option>
+            </select>
+            <button onclick="convertCurrency()">💱 Konversi</button>
+            <div class="tool-result" id="currResult"></div>
+          </div>
+        `;
+                  } else if (toolName === 'texttools') {
+        html = `
+          <div class="tool-modal-header">
+            <h3>📝 Text Tools</h3>
+            <button class="tool-modal-close" onclick="closeToolModal()">✕</button>
+          </div>
+          <div class="tool-body">
+            <label>Teks Input:</label>
+            <textarea id="txtInput" placeholder="Masukkan teks..." oninput="updateTextStats()"></textarea>
+            <div id="txtStats" style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem;">Karakter: 0 | Kata: 0 | Baris: 0</div>
+            <button onclick="transformText('upper')">ABC UPPERCASE</button>
+            <button class="btn-secondary" onclick="transformText('lower')">abc lowercase</button>
+            <button class="btn-secondary" onclick="transformText('title')">Abc Title Case</button>
+            <button class="btn-secondary" onclick="transformText('reverse')">ɘsɿɘvɘЯ</button>
+            <button class="btn-secondary" onclick="transformText('trim')">Trim Spaces</button>
+            <button class="btn-secondary" onclick="copyTextResult()">📋 Copy Hasil</button>
+            <div class="tool-result" id="txtResult"></div>
+          </div>
+        `;
+            } else if (toolName === 'uploadimage') {
+        html = `
+          <div class="tool-modal-header">
+            <h3>🖼️ Upload Foto → URL</h3>
+            <button class="tool-modal-close" onclick="closeToolModal()">✕</button>
+          </div>
+          <div class="tool-body">
+            <label>Pilih Gambar (Max 5MB):</label>
+            <input type="file" id="uploadImgInput" accept="image/*" style="padding:0.5rem; cursor:pointer;">
+            <div id="uploadImgPreview" style="display:none; margin-top:0.75rem;">
+              <img id="uploadImgThumb" src="" alt="Preview" style="width:100%; max-height:220px; object-fit:contain; border-radius:10px; border:1.5px solid var(--border-color);">
+            </div>
+            <button onclick="uploadImageToUrl()" id="btnUploadImg" style="margin-top:0.85rem;">☁️ Upload & Dapatkan URL</button>
+            <div class="tool-result" id="uploadImgResult"></div>
+          </div>
+        `;
+      }
+
+      content.innerHTML = html;
+
+      if (toolName === 'uploadimage') {
+        setTimeout(() => {
+          const input = document.getElementById('uploadImgInput');
+          if (input) input.addEventListener('change', previewUploadImage);
+        }, 50);
+      }
+      modal.classList.add('active');
+    }
+
+    function closeToolModal() {
+      const modal = document.getElementById('toolModal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    async function downloadTikTok() {
+      const url = document.getElementById('ttUrl').value.trim();
+      const resultEl = document.getElementById('ttResult');
+      const previewEl = document.getElementById('ttPreview');
+
+      if (!url) { alert('Masukkan link TikTok dulu!'); return; }
+      if (!url.includes('tiktok.com')) { alert('Link tidak valid. Harus dari TikTok!'); return; }
+
+      resultEl.className = 'tool-result show';
+      resultEl.textContent = '⏳ Memproses video...';
+      previewEl.className = 'tiktok-result';
+      previewEl.innerHTML = '';
+
+      try {
+        const res = await fetch(`${TOOLS_API_BASE}/api/tools/tiktok?url=${encodeURIComponent(url)}`);
+        const data = await res.json();
+
+        if (data.success && data.data) {
+          resultEl.textContent = '✓ Berhasil! Pilih format download:';
+          let preview = '';
+          if (data.data.cover) preview += `<img src="${data.data.cover}" alt="Cover">`;
+          if (data.data.title) preview += `<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.5rem;">${data.data.title}</p>`;
+          if (data.data.video) preview += `<a href="${data.data.video}" target="_blank" download>📹 Download Video (MP4 - No Watermark)</a>`;
+          if (data.data.audio) preview += `<a href="${data.data.audio}" target="_blank" download>🎵 Download Audio (MP3)</a>`;
+          previewEl.innerHTML = preview;
+          previewEl.classList.add('show');
+        } else {
+          resultEl.textContent = '❌ Gagal: ' + (data.message || 'Cek link kamu');
+        }
+      } catch (err) {
+        resultEl.textContent = '❌ Error: ' + err.message;
+      }
+    }
+
+    async function generateShortlink() {
+      const url = document.getElementById('slUrl').value.trim();
+      const resultEl = document.getElementById('slResult');
+      if (!url) { alert('Masukkan link dulu!'); return; }
+      if (!/^https?:\/\//.test(url)) { alert('Link harus diawali http:// atau https://'); return; }
+
+      resultEl.className = 'tool-result show';
+      resultEl.textContent = '⏳ Memproses...';
+
+      try {
+        const res = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`);
+        const shortUrl = await res.text();
+        resultEl.innerHTML = `✓ Link pendek:<br><br><strong style="color:var(--accent);font-size:1rem;">${shortUrl}</strong><br><br><button class="btn-secondary" style="margin-top:0.5rem;" onclick="navigator.clipboard.writeText('${shortUrl}');alert('✓ Tersalin!')">📋 Copy</button>`;
+      } catch (err) {
+        resultEl.textContent = '❌ Error: ' + err.message;
+      }
+    }
+
+    function generateQR() {
+      const text = document.getElementById('qrText').value.trim();
+      const previewEl = document.getElementById('qrPreview');
+      if (!text) { alert('Masukkan teks dulu!'); return; }
+
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(text)}`;
+      previewEl.innerHTML = `
+        <img src="${qrUrl}" alt="QR Code" style="border-radius:10px;border:2px solid var(--border-color);">
+        <br><br>
+        <a href="${qrUrl}" target="_blank" download="qrcode.png" style="display:inline-block;padding:0.65rem 1rem;background:var(--accent);color:#000;text-decoration:none;border-radius:8px;font-weight:700;font-size:0.85rem;">⬇️ Download QR</a>
+      `;
+    }
+
+    function calcExpression() {
+      const expr = document.getElementById('calcInput').value.trim();
+      const resultEl = document.getElementById('calcResult');
+      if (!expr) { alert('Masukkan ekspresi dulu!'); return; }
+
+      try {
+        if (!/^[0-9+\-*/().\s%]+$/.test(expr)) throw new Error('Ekspresi tidak valid');
+        const result = Function('"use strict"; return (' + expr + ')')();
+        resultEl.className = 'tool-result show';
+        resultEl.textContent = result;
+      } catch (e) {
+        resultEl.className = 'tool-result show';
+        resultEl.textContent = '❌ Error: ' + e.message;
+      }
+    }
+
+    function base64Encode() {
+      const input = document.getElementById('b64Input').value;
+      const resultEl = document.getElementById('b64Result');
+      try {
+        const encoded = btoa(unescape(encodeURIComponent(input)));
+        resultEl.className = 'tool-result show';
+        resultEl.textContent = encoded;
+      } catch (e) {
+        resultEl.className = 'tool-result show';
+        resultEl.textContent = '❌ Error: ' + e.message;
+      }
+    }
+
+    function base64Decode() {
+      const input = document.getElementById('b64Input').value;
+      const resultEl = document.getElementById('b64Result');
+      try {
+        const decoded = decodeURIComponent(escape(atob(input)));
+        resultEl.className = 'tool-result show';
+        resultEl.textContent = decoded;
+      } catch (e) {
+        resultEl.className = 'tool-result show';
+        resultEl.textContent = '❌ Error: Base64 tidak valid';
+      }
+    }
+
+    function generatePassword() {
+      const len = parseInt(document.getElementById('pwdLength').value);
+      const useUpper = document.getElementById('pwdUpper').checked;
+      const useLower = document.getElementById('pwdLower').checked;
+      const useNum = document.getElementById('pwdNum').checked;
+      const useSym = document.getElementById('pwdSym').checked;
+
+      let chars = '';
+      if (useUpper) chars += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      if (useLower) chars += 'abcdefghijklmnopqrstuvwxyz';
+      if (useNum) chars += '0123456789';
+      if (useSym) chars += '!@#$%^&*()_+-=[]{}|;:,.<>?';
+
+      if (!chars) { alert('Pilih minimal 1 jenis karakter!'); return; }
+
+      let pwd = '';
+      const cryptoObj = window.crypto || window.msCrypto;
+      const arr = new Uint32Array(len);
+      cryptoObj.getRandomValues(arr);
+      for (let i = 0; i < len; i++) {
+        pwd += chars[arr[i] % chars.length];
+      }
+
+      const resultEl = document.getElementById('pwdResult');
+      resultEl.className = 'tool-result show';
+      resultEl.innerHTML = `<strong style="color:var(--accent);word-break:break-all;">${pwd}</strong><br><br><button class="btn-secondary" onclick="navigator.clipboard.writeText('${pwd}');alert('✓ Tersalin!')">📋 Copy</button>`;
+    }
+
+    async function convertCurrency() {
+      const amount = parseFloat(document.getElementById('currAmount').value) || 0;
+      const from = document.getElementById('currFrom').value;
+      const to = document.getElementById('currTo').value;
+      const resultEl = document.getElementById('currResult');
+
+      resultEl.className = 'tool-result show';
+      resultEl.textContent = '⏳ Mengambil kurs terbaru...';
+
+      try {
+        const res = await fetch(`https://api.frankfurter.app/latest?amount=${amount}&from=${from}&to=${to}`);
+        const data = await res.json();
+        if (data.rates && data.rates[to]) {
+          resultEl.innerHTML = `✓ ${amount.toLocaleString('id-ID')} ${from} = <strong style="color:var(--accent);font-size:1.1rem;">${data.rates[to].toLocaleString('id-ID')} ${to}</strong>`;
+        } else {
+          resultEl.textContent = '❌ Gagal mengambil kurs. Coba lagi.';
+        }
+      } catch (err) {
+        resultEl.textContent = '❌ Error: ' + err.message;
+      }
+    }
+
+    function updateTextStats() {
+      const text = document.getElementById('txtInput').value;
+      const statsEl = document.getElementById('txtStats');
+      if (!statsEl) return;
+      const chars = text.length;
+      const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+      const lines = text ? text.split('\n').length : 0;
+      statsEl.textContent = `Karakter: ${chars} | Kata: ${words} | Baris: ${lines}`;
+    }
+
+    function transformText(mode) {
+      const input = document.getElementById('txtInput').value;
+      const resultEl = document.getElementById('txtResult');
+      let out = input;
+
+      if (mode === 'upper') out = input.toUpperCase();
+      else if (mode === 'lower') out = input.toLowerCase();
+      else if (mode === 'title') out = input.replace(/\w\S*/g, t => t.charAt(0).toUpperCase() + t.substr(1).toLowerCase());
+      else if (mode === 'reverse') out = input.split('').reverse().join('');
+      else if (mode === 'trim') out = input.split('\n').map(l => l.trim()).join('\n').replace(/\n{3,}/g, '\n\n');
+
+      resultEl.className = 'tool-result show';
+      resultEl.textContent = out;
+      window._lastTextResult = out;
+    }
+
+    function copyTextResult() {
+      if (window._lastTextResult) {
+        navigator.clipboard.writeText(window._lastTextResult);
+        alert('✓ Hasil tersalin ke clipboard!');
+      } else {
+        alert('Belum ada hasil untuk disalin.');
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const btnPwd = document.getElementById('btnChangePwdDrawer');
+      if (btnPwd) btnPwd.onclick = changePassword;
+
+      const btnUpd = document.getElementById('btnUpdateApkDrawer');
+      if (btnUpd) btnUpd.onclick = checkUpdate;
+
+      initDashboardView();
+      detectDevice();
+      initBatteryStatus();
+
+      const savedLocation = JSON.parse(localStorage.getItem('user_location_approved'));
+      if (savedLocation) {
+        const statusEl = document.getElementById('locationStatus');
+        const timeZoneEl = document.getElementById('userTimezone');
+        const btn = document.getElementById('btnRequestLocation');
+
+        if (statusEl) {
+          statusEl.textContent = "● Disetujui (Aktif)";
+          statusEl.style.color = "#22c55e";
+        }
+        if (timeZoneEl) timeZoneEl.textContent = savedLocation.timezone;
+
+        if (btn) {
+          btn.textContent = "✓ Lokasi Telah Disetujui";
+          btn.style.background = "rgba(34, 197, 94, 0.15)";
+          btn.style.borderColor = "#22c55e";
+          btn.style.color = "#22c55e";
+          btn.disabled = true;
+        }
+      }
+
+      const chatForm = document.getElementById('chatForm');
+      if (chatForm) {
+        chatForm.addEventListener('submit', sendGlobalChat);
+      }
+
+      toggleDailyDaysInput();
+      calculateSalesTax();
+      renderWaConnectedInfo();
+
+      loadGlobalChats().then(() => {
+        const container = document.getElementById('chatMessages');
+        if (container) container.scrollTop = container.scrollHeight;
+      });
+
+      chatIntervalTimer = setInterval(loadGlobalChats, 2000);
+    });
+
+        /* ============================================
+       ===== UPLOAD IMAGE TO URL ==================
+       ============================================ */
+    function previewUploadImage(event) {
+      const file = event.target.files[0];
+      const preview = document.getElementById('uploadImgPreview');
+      const thumb = document.getElementById('uploadImgThumb');
+      const resultEl = document.getElementById('uploadImgResult');
+
+      if (!file) {
+        if (preview) preview.style.display = 'none';
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        alert('❌ Ukuran gambar max 5MB!');
+        event.target.value = '';
+        return;
+      }
+
+      if (!file.type.startsWith('image/')) {
+        alert('❌ File harus berupa gambar!');
+        event.target.value = '';
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        thumb.src = e.target.result;
+        preview.style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+
+      if (resultEl) {
+        resultEl.className = 'tool-result';
+        resultEl.textContent = '';
+      }
+    }
+
+        async function uploadImageToUrl() {
+      const input = document.getElementById('uploadImgInput');
+      const resultEl = document.getElementById('uploadImgResult');
+      const btn = document.getElementById('btnUploadImg');
+
+      if (!input || !input.files || !input.files[0]) {
+        alert('❌ Pilih gambar terlebih dahulu!');
+        return;
+      }
+
+      const file = input.files[0];
+
+      resultEl.className = 'tool-result show';
+      resultEl.textContent = '⏳ Meng-upload gambar...';
+      btn.disabled = true;
+      btn.textContent = '⏳ Uploading...';
+
+      try {
+        // Convert ke base64
+        const reader = new FileReader();
+        const base64Promise = new Promise((resolve, reject) => {
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        const base64Image = await base64Promise;
+
+        // Kirim ke BACKEND Vercel tuan (server.js)
+        const res = await fetch(`${TOOLS_API_BASE}/api/tools/upload-base64`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image: base64Image,
+            filename: file.name || 'upload.jpg'
+          })
+        });
+
+        const data = await res.json();
+
+        if (data.success && data.url) {
+          resultEl.innerHTML = `✓ Berhasil upload (via ${data.source})!<br><br>
+            <strong style="color:var(--accent); font-size:0.9rem; word-break:break-all;">${data.url}</strong><br><br>
+            <button class="btn-secondary" onclick="navigator.clipboard.writeText('${data.url}'); alert('✓ URL tersalin!')">📋 Copy URL</button>
+            <button class="btn-secondary" onclick="window.open('${data.url}', '_blank')">🔗 Buka Gambar</button>`;
+        } else {
+          resultEl.innerHTML = `❌ Gagal upload: ${data.message || 'Unknown error'}<br><br><small>Coba lagi atau pilih gambar lain.</small>`;
+        }
+      } catch (err) {
+        resultEl.innerHTML = `❌ Gagal upload: ${err.message}<br><br><small>Cek koneksi internet tuan.</small>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '☁️ Upload & Dapatkan URL';
+      }
+    }
+
+  </script>
+
+</body>
+</html>
